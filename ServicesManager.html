@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f9fa;
+      color: #111111;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* HEADER STYLES */
+    .header {
+      background-color: transparent;
+      padding: 15px 20px 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #1557bf;
+      margin-bottom: 25px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0d47a1;
+    }
+
+    .btn-home {
+      background-color: #e0e0e0;
+      color: #000000;
+      border: 1px solid #9e9e9e;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-home:hover {
+      background-color: #d6d6d6;
+    }
+
+    /* CONTAINER & CARDS */
+    .container {
+      max-width: 950px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 2px solid #1557bf;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #0d47a1;
+    }
+
+    /* FORM STYLES */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group label {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #0d47a1;
+    }
+
+    .form-group input {
+      padding: 8px 12px;
+      font-size: 15px;
+      border: 1px solid #1557bf;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .search-box {
+      margin-bottom: 16px;
+    }
+
+    .btn-submit {
+      background: #1557bf;
+      color: #ffffff;
+      border: none;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn-submit:hover {
+      background: #0d47a1;
+    }
+
+    .btn-cancel {
+      background: #757575;
+      color: #ffffff;
+      border: none;
+      padding: 10px 14px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      display: none;
+    }
+
+    /* TABLE & SORTING STYLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th {
+      background: #e8f0fe;
+      color: #0d47a1;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th:hover {
+      background: #d2e3fc;
+    }
+
+    .sort-icon {
+      font-size: 12px;
+      margin-left: 4px;
+    }
+
+    .actions-cell {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .btn-edit {
+      background: #1557bf;
+      color: #ffffff;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+
+    .btn-delete {
+      background: #c62828;
+      color: #ffffff;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .loading-text {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">Park Cleaners - Service Manager</div>
+    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <div class="container">
+
+    <!-- ADD / EDIT SERVICE FORM -->
+    <div class="card">
+      <div class="card-title" id="form-header">Add New Service</div>
+      <form id="serviceForm" onsubmit="handleFormSubmit(event)">
+        <input type="hidden" id="rowIndex" value="">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="serviceName">Service Name</label>
+            <input type="text" id="serviceName" placeholder="e.g. Suit Cleaning" required>
+          </div>
+
+          <div class="form-group">
+            <label for="servicePrice">Price ($)</label>
+            <input type="number" step="0.01" min="0" id="servicePrice" placeholder="0.00" required>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn-submit" id="saveBtn">Save Service</button>
+            <button type="button" class="btn-cancel" id="cancelBtn" onclick="resetForm()">Cancel</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- SERVICES LIST TABLE -->
+    <div class="card">
+      <div class="card-title">Existing Services</div>
+
+      <!-- SEARCH INPUT -->
+      <div class="form-group search-box">
+        <input type="text" id="searchInput" placeholder="🔍 Search services..." oninput="renderServicesTable()">
+      </div>
+
+      <div id="tableContainer">
+        <div class="loading-text">Loading services...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let servicesData = [];
+    let currentSortColumn = 'service';
+    let currentSortDirection = 'asc';
+
+    window.onload = function() {
+      loadServices();
+    };
+
+    function goHome() {
+      google.script.run
+        .withSuccessHandler(function(html) {
+          document.open();
+          document.write(html);
+          document.close();
+        })
+        .loadPage("Index");
+    }
+
+    function loadServices() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          servicesData = data || [];
+          renderServicesTable();
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById("tableContainer").innerHTML = 
+            '<div class="loading-text" style="color: #c62828;">Failed to load services: ' + err.message + '</div>';
+        })
+        .getServicesData();
+    }
+
+    function cleanPrice(priceVal) {
+      if (!priceVal) return 0;
+      let cleanStr = priceVal.toString().replace(/[^0-9.-]+/g, "");
+      let parsed = parseFloat(cleanStr);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    function toggleSort(columnKey) {
+      if (currentSortColumn === columnKey) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortColumn = columnKey;
+        currentSortDirection = 'asc';
+      }
+      renderServicesTable();
+    }
+
+    function renderServicesTable() {
+      const container = document.getElementById("tableContainer");
+      const filterValue = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toLowerCase().trim() : '';
+
+      if (!servicesData || servicesData.length === 0) {
+        container.innerHTML = '<div class="loading-text">No services found. Add one above!</div>';
+        return;
+      }
+
+      // Filter services based on search input
+      let filteredData = servicesData.filter(function(item) {
+        return (item.service || '').toLowerCase().includes(filterValue);
+      });
+
+      if (filteredData.length === 0) {
+        container.innerHTML = '<div class="loading-text">No matching services found.</div>';
+        return;
+      }
+
+      // Sort filtered data
+      filteredData.sort(function(a, b) {
+        let valA, valB;
+        if (currentSortColumn === 'price') {
+          valA = cleanPrice(a.price);
+          valB = cleanPrice(b.price);
+        } else {
+          valA = (a.service || '').toLowerCase();
+          valB = (b.service || '').toLowerCase();
+        }
+
+        if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      const serviceIcon = currentSortColumn === 'service' ? (currentSortDirection === 'asc' ? '▲' : '▼') : '↕';
+      const priceIcon = currentSortColumn === 'price' ? (currentSortDirection === 'asc' ? '▲' : '▼') : '↕';
+
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th onclick="toggleSort('service')">Service Name <span class="sort-icon">${serviceIcon}</span></th>
+              <th onclick="toggleSort('price')" style="width: 140px;">Price <span class="sort-icon">${priceIcon}</span></th>
+              <th style="text-align: right; cursor: default; width: 140px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      filteredData.forEach(function(item) {
+        const numericPrice = cleanPrice(item.price);
+        const formattedPriceDisplay = '$' + numericPrice.toFixed(2);
+        const escapedService = (item.service || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+        html += `
+          <tr>
+            <td><strong>${item.service}</strong></td>
+            <td>${formattedPriceDisplay}</td>
+            <td class="actions-cell">
+              <button class="btn-edit" onclick="editService(${item.rowIndex}, '${escapedService}', ${numericPrice})">Edit</button>
+              <button class="btn-delete" onclick="deleteServiceRow(${item.rowIndex}, '${escapedService}')">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+
+      const rowIndex = document.getElementById("rowIndex").value;
+      const service = document.getElementById("serviceName").value.trim();
+      const price = document.getElementById("servicePrice").value;
+
+      if (!service || price === "") return;
+
+      const saveBtn = document.getElementById("saveBtn");
+      saveBtn.disabled = true;
+      saveBtn.innerText = "Saving...";
+
+      const data = {
+        rowIndex: rowIndex ? parseInt(rowIndex) : null,
+        service: service,
+        price: parseFloat(price)
+      };
+
+      google.script.run
+        .withSuccessHandler(function() {
+          resetForm();
+          loadServices();
+        })
+        .withFailureHandler(function(err) {
+          alert("Error saving service: " + err.message);
+          saveBtn.disabled = false;
+          saveBtn.innerText = "Save Service";
+        })
+        .saveService(data);
+    }
+
+    function editService(rowIndex, serviceName, priceNum) {
+      document.getElementById("rowIndex").value = rowIndex;
+      document.getElementById("serviceName").value = serviceName;
+      document.getElementById("servicePrice").value = priceNum.toFixed(2);
+
+      document.getElementById("form-header").innerText = "Edit Service";
+      document.getElementById("saveBtn").innerText = "Update Service";
+      document.getElementById("cancelBtn").style.display = "inline-block";
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      document.getElementById("rowIndex").value = "";
+      document.getElementById("serviceName").value = "";
+      document.getElementById("servicePrice").value = "";
+
+      document.getElementById("form-header").innerText = "Add New Service";
+      document.getElementById("saveBtn").innerText = "Save Service";
+      document.getElementById("saveBtn").disabled = false;
+      document.getElementById("cancelBtn").style.display = "none";
+    }
+
+    function deleteServiceRow(rowIndex, serviceName) {
+      if (confirm(`Are you sure you want to delete "${serviceName}"?`)) {
+        google.script.run
+          .withSuccessHandler(function() {
+            loadServices();
+          })
+          .withFailureHandler(function(err) {
+            alert("Error deleting service: " + err.message);
+          })
+          .deleteService(rowIndex);
+      }
+    }
+  </script>
+
+</body>
+
+</html>

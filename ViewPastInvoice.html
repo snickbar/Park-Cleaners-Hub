@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+      background: #f7f9fa;
+      color: #111111;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    .header-bar {
+      height: 60px;
+      background: #ffffff;
+      border-bottom: 4px solid #1976d2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0d47a1;
+    }
+
+    .btn-home {
+      background: #e0e0e0;
+      color: #111;
+      border: 2px solid #888;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* CONTAINER */
+    .main-container {
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* SEARCH FILTER PANEL */
+    .filter-card {
+      background: #ffffff;
+      border: 3px solid #1976d2;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field-label {
+      font-size: 14px;
+      font-weight: bold;
+      color: #0d47a1;
+      margin-bottom: 4px;
+    }
+
+    .filter-input, .filter-select {
+      height: 42px;
+      font-size: 16px;
+      padding: 4px 10px;
+      border: 2px solid #1976d2;
+      border-radius: 6px;
+      font-weight: bold;
+      background: #fff;
+    }
+
+    .btn-clear {
+      height: 42px;
+      padding: 0 16px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #e0e0e0;
+      border: 2px solid #888;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* TABLE RESULTS */
+    .table-container {
+      flex: 1;
+      background: #ffffff;
+      border: 2px solid #ccc;
+      border-radius: 12px;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .invoice-table th {
+      background: #e3f2fd;
+      color: #0d47a1;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      border-bottom: 3px solid #1976d2;
+      z-index: 10;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .invoice-table th:hover {
+      background: #bbdefb;
+    }
+
+    .invoice-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .invoice-table tr:hover {
+      background-color: #f5f5f5;
+    }
+
+    .btn-pdf {
+      background: #1976d2;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-pdf:hover {
+      background: #0d47a1;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 40px;
+      font-size: 18px;
+      color: #777;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER BAR -->
+  <div class="header-bar">
+    <div class="header-title">Park Cleaners - View Past Invoices</div>
+    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+  </div>
+
+  <div class="main-container">
+
+    <!-- SEPARATED SEARCH FILTER BAR -->
+    <div class="filter-card">
+      <div class="filter-grid">
+        <!-- INVOICE # SEARCH -->
+        <div class="field-group">
+          <label class="field-label">Invoice #</label>
+          <input type="text" id="searchNum" class="filter-input" placeholder="e.g. 1080" onkeyup="filterInvoices()">
+        </div>
+
+        <!-- CUSTOMER DROPDOWN -->
+        <div class="field-group">
+          <label class="field-label">Customer</label>
+          <select id="searchCustomer" class="filter-select" onchange="filterInvoices()">
+            <option value="">-- All Customers --</option>
+          </select>
+        </div>
+
+        <!-- DATE SEARCH -->
+        <div class="field-group">
+          <label class="field-label">Date Issued</label>
+          <input type="text" id="searchDate" class="filter-input" placeholder="MM/DD/YYYY" onkeyup="filterInvoices()">
+        </div>
+
+        <!-- SERVICE / ITEMS SEARCH -->
+        <div class="field-group">
+          <label class="field-label">Service / Items</label>
+          <input type="text" id="searchItems" class="filter-input" placeholder="e.g. Game Jersey" onkeyup="filterInvoices()">
+        </div>
+
+        <!-- CLEAR BUTTON -->
+        <button class="btn-clear" onclick="clearSearch()">Clear Filters</button>
+      </div>
+    </div>
+
+    <!-- INVOICE LIST TABLE -->
+    <div class="table-container">
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('invoiceNum')">Invoice # <span id="sort_invoiceNum"></span></th>
+            <th onclick="sortTable('date')">Date Issued <span id="sort_date"></span></th>
+            <th onclick="sortTable('customer')">Customer <span id="sort_customer"></span></th>
+            <th onclick="sortTable('items')">Services / Items <span id="sort_items"></span></th>
+            <th onclick="sortTable('total')">Total <span id="sort_total"></span></th>
+            <th style="cursor: default;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="invoiceTableBody">
+          <tr>
+            <td colspan="6" class="no-data">Loading invoice history...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    let rawInvoices = [];
+    let displayedInvoices = [];
+    let currentSortField = 'date'; // Default: Sort by Date
+    let isAscending = false;        // Default: Most recent date first
+
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(handleError)
+        .getInvoiceHistory();
+    };
+
+    function onDataLoaded(res) {
+      rawInvoices = res.invoices || [];
+      populateCustomerDropdown(res.customers || []);
+      
+      // Default filter & sort by most recent date first
+      filterInvoices();
+    }
+
+    function populateCustomerDropdown(customers) {
+      const select = document.getElementById("searchCustomer");
+      customers.forEach(cust => {
+        const opt = document.createElement("option");
+        opt.value = cust;
+        opt.textContent = cust;
+        select.appendChild(opt);
+      });
+    }
+
+    function filterInvoices() {
+      const numQuery = document.getElementById("searchNum").value.toLowerCase().trim();
+      const custQuery = document.getElementById("searchCustomer").value.toLowerCase().trim();
+      const dateQuery = document.getElementById("searchDate").value.toLowerCase().trim();
+      const itemsQuery = document.getElementById("searchItems").value.toLowerCase().trim();
+
+      displayedInvoices = rawInvoices.filter(item => {
+        const matchNum = !numQuery || item.invoiceNum.toLowerCase().includes(numQuery);
+        const matchCust = !custQuery || item.customer.toLowerCase() === custQuery;
+        const matchDate = !dateQuery || item.date.toLowerCase().includes(dateQuery);
+        const matchItems = !itemsQuery || item.items.toLowerCase().includes(itemsQuery);
+        return matchNum && matchCust && matchDate && matchItems;
+      });
+
+      applySorting();
+    }
+
+    function sortTable(field) {
+      if (currentSortField === field) {
+        isAscending = !isAscending;
+      } else {
+        currentSortField = field;
+        isAscending = (field === 'customer' || field === 'items'); // Text defaults A-Z, Numbers/Dates default Desc
+      }
+      applySorting();
+    }
+
+    function parseDateValue(dateStr) {
+      if (!dateStr) return 0;
+      // Handle standard MM/DD/YYYY format cleanly
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const month = parseInt(parts[0], 10) - 1;
+        const day = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month, day).getTime();
+      }
+      const parsed = new Date(dateStr);
+      return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+    }
+
+    function applySorting() {
+      displayedInvoices.sort((a, b) => {
+        let valA = a[currentSortField] || '';
+        let valB = b[currentSortField] || '';
+        let result = 0;
+
+        // Numeric comparison for Total & Invoice #
+        if (currentSortField === 'total' || currentSortField === 'invoiceNum') {
+          valA = parseFloat(valA) || 0;
+          valB = parseFloat(valB) || 0;
+          if (valA < valB) result = -1;
+          if (valA > valB) result = 1;
+        } 
+        // Date comparison
+        else if (currentSortField === 'date') {
+          valA = parseDateValue(valA);
+          valB = parseDateValue(valB);
+          if (valA < valB) result = -1;
+          if (valA > valB) result = 1;
+          
+          // Fallback to highest invoice number if dates match
+          if (result === 0) {
+            const numA = parseFloat(a.invoiceNum) || 0;
+            const numB = parseFloat(b.invoiceNum) || 0;
+            return isAscending ? (numA - numB) : (numB - numA);
+          }
+        } 
+        // String comparison
+        else {
+          valA = valA.toString().toLowerCase();
+          valB = valB.toString().toLowerCase();
+          if (valA < valB) result = -1;
+          if (valA > valB) result = 1;
+        }
+
+        return isAscending ? result : -result;
+      });
+
+      updateSortIcons();
+      renderTable(displayedInvoices);
+    }
+
+    function updateSortIcons() {
+      const fields = ['invoiceNum', 'date', 'customer', 'items', 'total'];
+      fields.forEach(f => {
+        const span = document.getElementById('sort_' + f);
+        if (f === currentSortField) {
+          span.textContent = isAscending ? '▲' : '▼';
+        } else {
+          span.textContent = '';
+        }
+      });
+    }
+
+    function renderTable(records) {
+      const tbody = document.getElementById("invoiceTableBody");
+      tbody.innerHTML = "";
+
+      if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No matching invoices found.</td></tr>';
+        return;
+      }
+
+      records.forEach(row => {
+        const tr = document.createElement("tr");
+        const pdfBtn = row.pdfUrl 
+          ? `<a href="${row.pdfUrl}" target="_blank" class="btn-pdf">📄 View PDF</a>` 
+          : `<span style="color:#aaa;">N/A</span>`;
+
+        tr.innerHTML = `
+          <td><strong>#${row.invoiceNum}</strong></td>
+          <td>${row.date}</td>
+          <td><strong>${row.customer}</strong></td>
+          <td>${row.items}</td>
+          <td><strong>$${row.total}</strong></td>
+          <td>${pdfBtn}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function clearSearch() {
+      document.getElementById("searchNum").value = "";
+      document.getElementById("searchCustomer").value = "";
+      document.getElementById("searchDate").value = "";
+      document.getElementById("searchItems").value = "";
+      filterInvoices();
+    }
+
+    function handleError(err) {
+      document.getElementById("invoiceTableBody").innerHTML = 
+        `<tr><td colspan="6" class="no-data" style="color:red;">Error loading history: ${err.message}</td></tr>`;
+    }
+
+    function goHome() {
+      google.script.run
+        .withSuccessHandler(function(htmlContent) {
+          document.open();
+          document.write(htmlContent);
+          document.close();
+        })
+        .withFailureHandler(function(err) {
+          alert("Error returning to home: " + err.message);
+        })
+        .loadPage("Index");
+    }
+  </script>
+</body>
+
+</html>

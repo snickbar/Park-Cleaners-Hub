@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <base target="_top">
+
+  <style>
+
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+
+    textarea {
+      height: 65px;
+      resize: none;
+    }
+
+    .buttons {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 9px 16px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+      min-height: 20px;
+    }
+
+    .success {
+      color: green;
+    }
+
+    .error {
+      color: red;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+
+  <label>
+    Date
+  </label>
+
+  <input
+    type="date"
+    id="date"
+  >
+
+
+  <label>
+    Service
+  </label>
+
+  <select
+    id="service"
+  >
+
+    <option value="">
+      Loading services...
+    </option>
+
+  </select>
+
+
+  <label>
+    Notes
+  </label>
+
+  <textarea
+    id="notes"
+  ></textarea>
+
+
+  <label>
+    Quantity
+  </label>
+
+  <input
+    type="number"
+    id="quantity"
+    min="1"
+    step="1"
+  >
+
+
+  <div
+    class="buttons"
+  >
+
+    <button
+      onclick="addItem()"
+    >
+      Add Item
+    </button>
+
+    <button
+      onclick="google.script.host.close()"
+    >
+      Done
+    </button>
+
+  </div>
+
+
+  <div
+    id="status"
+  ></div>
+
+
+  <script>
+
+
+    // ===============================
+    // DEFAULT DATE TO TODAY
+    // ===============================
+
+    document
+      .getElementById("date")
+      .value =
+      new Date()
+        .toISOString()
+        .split("T")[0];
+
+
+    // ===============================
+    // LOAD SERVICES
+    // ===============================
+
+    google
+      .script
+      .run
+
+      .withSuccessHandler(
+
+        function(services) {
+
+
+          const select =
+            document
+              .getElementById("service");
+
+
+          select.innerHTML =
+            '<option value="">Select a service</option>';
+
+
+          services.forEach(
+
+            function(service) {
+
+
+              const option =
+                document
+                  .createElement("option");
+
+
+              option.value =
+                service;
+
+
+              option.textContent =
+                service;
+
+
+              select
+                .appendChild(option);
+
+
+            }
+
+          );
+
+
+        }
+
+      )
+
+      .withFailureHandler(
+
+        function(error) {
+
+
+          document
+            .getElementById("status")
+            .textContent =
+            "Error loading services: " +
+            error.message;
+
+
+        }
+
+      )
+
+      .getServicesForForm();
+
+
+    // ===============================
+    // ADD ITEM
+    // ===============================
+
+    function addItem() {
+
+
+      const date =
+        document
+          .getElementById("date")
+          .value;
+
+
+      const service =
+        document
+          .getElementById("service")
+          .value;
+
+
+      const notes =
+        document
+          .getElementById("notes")
+          .value;
+
+
+      const quantity =
+        document
+          .getElementById("quantity")
+          .value;
+
+
+      // Validate required fields
+
+      if (
+        !date ||
+        !service ||
+        !quantity
+      ) {
+
+
+        document
+          .getElementById("status")
+          .className =
+          "error";
+
+
+        document
+          .getElementById("status")
+          .textContent =
+          "Please complete the date, service, and quantity.";
+
+
+        return;
+
+
+      }
+
+
+      // Make sure quantity is a whole number greater than zero
+
+      if (
+        Number(quantity) <= 0 ||
+        !Number.isInteger(
+          Number(quantity)
+        )
+      ) {
+
+
+        document
+          .getElementById("status")
+          .className =
+          "error";
+
+
+        document
+          .getElementById("status")
+          .textContent =
+          "Quantity must be a whole number greater than 0.";
+
+
+        return;
+
+
+      }
+
+
+      document
+        .getElementById("status")
+        .className =
+        "";
+
+
+      document
+        .getElementById("status")
+        .textContent =
+        "Adding item...";
+
+
+      google
+        .script
+        .run
+
+        .withSuccessHandler(
+
+          function(message) {
+
+
+            document
+              .getElementById("status")
+              .className =
+              "success";
+
+
+            document
+              .getElementById("status")
+              .textContent =
+              message;
+
+
+            // Keep the date
+
+            // Reset service
+
+            document
+              .getElementById("service")
+              .value =
+              "";
+
+
+            // Clear notes
+
+            document
+              .getElementById("notes")
+              .value =
+              "";
+
+
+            // Clear quantity
+
+            document
+              .getElementById("quantity")
+              .value =
+              "";
+
+
+            // Put cursor back in service dropdown
+
+            document
+              .getElementById("service")
+              .focus();
+
+
+          }
+
+        )
+
+        .withFailureHandler(
+
+          function(error) {
+
+
+            document
+              .getElementById("status")
+              .className =
+              "error";
+
+
+            document
+              .getElementById("status")
+              .textContent =
+              error.message;
+
+
+          }
+
+        )
+
+        .addInvoiceItemFromForm(
+
+          date,
+          service,
+          notes,
+          quantity
+
+        );
+
+
+    }
+
+
+  </script>
+
+</body>
+
+</html>

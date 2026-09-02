@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f9fa;
+      color: #111111;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* HEADER STYLES MATCHING SCREENSHOT */
+    .header {
+      background-color: transparent;
+      padding: 15px 20px 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #1557bf;
+      margin-bottom: 25px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0d47a1;
+    }
+
+    .btn-home {
+      background-color: #e0e0e0;
+      color: #000000;
+      border: 1px solid #9e9e9e;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-home:hover {
+      background-color: #d6d6d6;
+    }
+
+    /* CONTAINER & CARDS */
+    .container {
+      max-width: 950px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 2px solid #1557bf;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #0d47a1;
+    }
+
+    /* FORM STYLES */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group label {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #0d47a1;
+    }
+
+    .form-group input {
+      padding: 8px 12px;
+      font-size: 15px;
+      border: 1px solid #1557bf;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .search-box {
+      margin-bottom: 16px;
+    }
+
+    .btn-submit {
+      background: #1557bf;
+      color: #ffffff;
+      border: none;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn-submit:hover {
+      background: #0d47a1;
+    }
+
+    .btn-cancel {
+      background: #757575;
+      color: #ffffff;
+      border: none;
+      padding: 10px 14px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      display: none;
+    }
+
+    /* TABLE & SORTING STYLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th {
+      background: #e8f0fe;
+      color: #0d47a1;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th:hover {
+      background: #d2e3fc;
+    }
+
+    .sort-icon {
+      font-size: 12px;
+      margin-left: 4px;
+    }
+
+    .actions-cell {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .btn-edit {
+      background: #1557bf;
+      color: #ffffff;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+
+    .btn-delete {
+      background: #c62828;
+      color: #ffffff;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .loading-text {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- EXACT MATCH HEADER -->
+  <div class="header">
+    <div class="header-title">Park Cleaners - Customer Manager</div>
+    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <div class="container">
+
+    <!-- ADD / EDIT CUSTOMER FORM -->
+    <div class="card">
+      <div class="card-title" id="form-header">Add New Customer</div>
+      <form id="customerForm" onsubmit="handleFormSubmit(event)">
+        <input type="hidden" id="rowIndex" value="">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="customerName">Customer Name</label>
+            <input type="text" id="customerName" placeholder="e.g. John Doe" required>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn-submit" id="saveBtn">Save Customer</button>
+            <button type="button" class="btn-cancel" id="cancelBtn" onclick="resetForm()">Cancel</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- CUSTOMERS LIST TABLE -->
+    <div class="card">
+      <div class="card-title">Existing Customers</div>
+
+      <!-- SEARCH INPUT -->
+      <div class="form-group search-box">
+        <input type="text" id="searchInput" placeholder="🔍 Search customers..." oninput="renderCustomersTable()">
+      </div>
+
+      <div id="tableContainer">
+        <div class="loading-text">Loading customers...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let customersData = [];
+    let currentSortColumn = 'name';
+    let currentSortDirection = 'asc';
+
+    window.onload = function() {
+      loadCustomers();
+    };
+
+    function goHome() {
+      google.script.run
+        .withSuccessHandler(function(html) {
+          document.open();
+          document.write(html);
+          document.close();
+        })
+        .loadPage("Index");
+    }
+
+    function loadCustomers() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          customersData = data || [];
+          renderCustomersTable();
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById("tableContainer").innerHTML = '<div class="loading-text" style="color: red;">Failed to load customers: ' + err.message + '</div>';
+        })
+        .getCustomersData();
+    }
+
+    function toggleSort(columnKey) {
+      if (currentSortColumn === columnKey) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortColumn = columnKey;
+        currentSortDirection = 'asc';
+      }
+      renderCustomersTable();
+    }
+
+    function renderCustomersTable() {
+      const container = document.getElementById("tableContainer");
+      const filterValue = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toLowerCase().trim() : '';
+
+      if (!customersData || customersData.length === 0) {
+        container.innerHTML = '<div class="loading-text">No customers found. Add one above!</div>';
+        return;
+      }
+
+      // Filter customers based on search input
+      let filteredData = customersData.filter(function(item) {
+        return (item.name || '').toLowerCase().includes(filterValue);
+      });
+
+      if (filteredData.length === 0) {
+        container.innerHTML = '<div class="loading-text">No matching customers found.</div>';
+        return;
+      }
+
+      // Sort filtered data
+      filteredData.sort(function(a, b) {
+        let valA = (a[currentSortColumn] || '').toString().toLowerCase();
+        let valB = (b[currentSortColumn] || '').toString().toLowerCase();
+
+        if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      const nameIcon = currentSortColumn === 'name' ? (currentSortDirection === 'asc' ? '▲' : '▼') : '↕';
+
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th onclick="toggleSort('name')">Customer Name <span class="sort-icon">${nameIcon}</span></th>
+              <th style="text-align: right; cursor: default;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      filteredData.forEach(function(item) {
+        const escapedName = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        html += `
+          <tr>
+            <td><strong>${item.name}</strong></td>
+            <td class="actions-cell">
+              <button class="btn-edit" onclick="editCustomer(${item.rowIndex}, '${escapedName}')">Edit</button>
+              <button class="btn-delete" onclick="deleteCustomerRow(${item.rowIndex}, '${escapedName}')">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+
+      const rowIndex = document.getElementById("rowIndex").value;
+      const name = document.getElementById("customerName").value.trim();
+
+      if (!name) return;
+
+      const saveBtn = document.getElementById("saveBtn");
+      saveBtn.disabled = true;
+      saveBtn.innerText = "Saving...";
+
+      const data = {
+        rowIndex: rowIndex ? parseInt(rowIndex) : null,
+        name: name
+      };
+
+      google.script.run
+        .withSuccessHandler(function() {
+          resetForm();
+          loadCustomers();
+        })
+        .withFailureHandler(function(err) {
+          alert("Error saving customer: " + err.message);
+          saveBtn.disabled = false;
+          saveBtn.innerText = "Save Customer";
+        })
+        .saveCustomer(data);
+    }
+
+    function editCustomer(rowIndex, name) {
+      document.getElementById("rowIndex").value = rowIndex;
+      document.getElementById("customerName").value = name;
+
+      document.getElementById("form-header").innerText = "Edit Customer";
+      document.getElementById("saveBtn").innerText = "Update Customer";
+      document.getElementById("cancelBtn").style.display = "inline-block";
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      document.getElementById("rowIndex").value = "";
+      document.getElementById("customerName").value = "";
+
+      document.getElementById("form-header").innerText = "Add New Customer";
+      document.getElementById("saveBtn").innerText = "Save Customer";
+      document.getElementById("saveBtn").disabled = false;
+      document.getElementById("cancelBtn").style.display = "none";
+    }
+
+    function deleteCustomerRow(rowIndex, customerName) {
+      if (confirm(`Are you sure you want to delete "${customerName}"?`)) {
+        google.script.run
+          .withSuccessHandler(function() {
+            loadCustomers();
+          })
+          .withFailureHandler(function(err) {
+            alert("Error deleting customer: " + err.message);
+          })
+          .deleteCustomer(rowIndex);
+      }
+    }
+  </script>
+
+</body>
+
+</html>

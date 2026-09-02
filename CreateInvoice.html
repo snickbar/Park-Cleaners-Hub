@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+      background: #f7f9fa;
+      color: #111111;
+      overflow: hidden;
+    }
+
+    /* HEADER */
+    .header-bar {
+      height: 60px;
+      background: #ffffff;
+      border-bottom: 4px solid #2e7d32;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1b5e20;
+    }
+
+    .btn-home {
+      background: #e0e0e0;
+      color: #111;
+      border: 2px solid #888;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* SPLIT SCREEN CONTAINER */
+    .main-container {
+      display: flex;
+      height: calc(100vh - 60px);
+      width: 100%;
+    }
+
+    /* LEFT PANEL */
+    .left-panel {
+      width: 50%;
+      background: #e8f5e9;
+      border-right: 4px solid #2e7d32;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      display: block;
+      color: #1b5e20;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      height: 48px;
+      font-size: 20px;
+      padding: 6px 12px;
+      border: 3px solid #2e7d32;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #111;
+      font-weight: bold;
+    }
+
+    .form-input:disabled, .form-select:disabled {
+      background: #e0e0e0;
+      color: #555;
+      border-color: #9e9e9e;
+    }
+
+    .notes-container {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-hash {
+      width: 56px;
+      height: 48px;
+      font-size: 24px;
+      font-weight: bold;
+      background: #2e7d32;
+      color: #ffffff;
+      border: 3px solid #1b5e20;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* NAV BUTTONS */
+    .nav-btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-nav {
+      flex: 1;
+      height: 52px;
+      font-size: 19px;
+      font-weight: bold;
+      border-radius: 8px;
+      border: 3px solid #111;
+      cursor: pointer;
+    }
+
+    .btn-prev { background: #bbdefb; border-color: #1976d2; color: #0d47a1; }
+    .btn-edit { background: #fff9c4; border-color: #fbc02d; color: #f57f17; }
+    .btn-save { background: #c8e6c9; border-color: #388e3c; color: #1b5e20; }
+    .btn-next { background: #bbdefb; border-color: #1976d2; color: #0d47a1; }
+
+    .btn-nav:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: #aaa;
+    }
+
+    /* FINALIZE BUTTON */
+    .btn-finalize {
+      width: 100%;
+      height: 64px;
+      font-size: 24px;
+      font-weight: bold;
+      background: #2e7d32;
+      color: #ffffff;
+      border: 4px solid #1b5e20;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .btn-finalize:hover {
+      background: #1b5e20;
+    }
+
+    /* RIGHT PANEL */
+    .right-panel {
+      width: 50%;
+      background: #ffffff;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .preview-header {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      color: #333;
+      border-bottom: 3px solid #2e7d32;
+      padding-bottom: 6px;
+    }
+
+    .preview-box {
+      border: 2px dashed #888;
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 400px;
+      background: #fafafa;
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+
+    .preview-table th, .preview-table td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+      font-size: 18px;
+    }
+
+    .preview-table th {
+      background: #e8f5e9;
+      color: #1b5e20;
+    }
+
+    .preview-total {
+      text-align: right;
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 20px;
+      color: #1b5e20;
+    }
+
+    /* MODALS */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border: 4px solid #2e7d32;
+      border-radius: 16px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+
+    .modal-title {
+      font-size: 26px;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .btn-modal {
+      flex: 1;
+      height: 54px;
+      font-size: 22px;
+      font-weight: bold;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-yes { background: #2e7d32; color: white; }
+    .btn-no { background: #c62828; color: white; }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER BAR -->
+  <div class="header-bar">
+    <div class="header-title">Park Cleaners - Create Invoice</div>
+    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+  </div>
+
+  <!-- SPLIT SCREEN LAYOUT -->
+  <div class="main-container">
+
+    <!-- LEFT PANEL: FORM CONTROLS -->
+    <div class="left-panel">
+      <div>
+        <!-- CUSTOMER -->
+        <div class="form-group">
+          <label class="form-label" for="customerSelect">Customer Name:</label>
+          <select id="customerSelect" class="form-select" onchange="updatePreview()">
+            <option value="">-- Select Customer --</option>
+          </select>
+        </div>
+
+        <!-- DATE OF SERVICE -->
+        <div class="form-group">
+          <label class="form-label" for="serviceDate">Date of Service:</label>
+          <input type="date" id="serviceDate" class="form-input" onchange="updatePreview()">
+        </div>
+
+        <hr style="border: 1px solid #a5d6a7; margin: 16px 0;">
+
+        <!-- SERVICE PROVIDED -->
+        <div class="form-group">
+          <label class="form-label" for="serviceSelect">Service Provided:</label>
+          <select id="serviceSelect" class="form-select">
+            <option value="">-- Select Service --</option>
+          </select>
+        </div>
+
+        <!-- NOTES -->
+        <div class="form-group">
+          <label class="form-label" for="itemNotes">Notes:</label>
+          <div class="notes-container">
+            <button type="button" class="btn-hash" onclick="insertHashtag()">#</button>
+            <input type="text" id="itemNotes" class="form-input" placeholder="Enter notes here...">
+          </div>
+        </div>
+
+        <!-- QUANTITY -->
+        <div class="form-group">
+          <label class="form-label" for="itemQty">How Many?</label>
+          <input type="number" id="itemQty" class="form-input" min="1" placeholder="Enter quantity">
+        </div>
+
+        <!-- ITEM NAVIGATION BUTTONS -->
+        <div class="nav-btn-row">
+          <button type="button" class="btn-nav btn-prev" id="btnPrev" onclick="navigateItem(-1)" disabled>◀ Prev</button>
+          <button type="button" class="btn-nav btn-edit" id="btnEdit" onclick="enableEdit()">✏️ Edit</button>
+          <button type="button" class="btn-nav btn-save" id="btnSave" onclick="saveCurrentItem()">➕ Save & Add Next</button>
+          <button type="button" class="btn-nav btn-next" id="btnNext" onclick="navigateItem(1)" disabled>Next ▶</button>
+        </div>
+      </div>
+
+      <!-- FINALIZE BUTTON -->
+      <div>
+        <button type="button" class="btn-finalize" onclick="promptFinalize()">FINALIZE & SUBMIT INVOICE</button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: LIVE INVOICE PREVIEW -->
+    <div class="right-panel">
+      <div class="preview-header">Live Invoice Preview</div>
+      <div class="preview-box">
+        <h2 style="margin-top:0; color:#1b5e20;">PARK CLEANERS</h2>
+        <p style="font-size: 18px;"><strong>Customer:</strong> <span id="prevCustomer"><i>Not Selected</i></span></p>
+        <p style="font-size: 18px;"><strong>Date:</strong> <span id="prevDate"><i>Not Selected</i></span></p>
+
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Service / Notes</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="previewTableBody">
+            <tr>
+              <td colspan="5" style="text-align: center; color: #777;">No items added yet.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="preview-total">
+          Grand Total: $<span id="prevGrandTotal">0.00</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL 1: ARE YOU SURE -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card">
+      <div class="modal-title">Are you sure you want to finalize and submit this invoice?</div>
+      <div class="modal-actions">
+        <button class="btn-modal btn-yes" id="btnSubmitInvoice" onclick="submitInvoice()">Yes, Submit</button>
+        <button class="btn-modal btn-no" onclick="closeModal('confirmModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SUCCESS & PRINT/VIEW -->
+  <div class="modal-overlay" id="successModal">
+    <div class="modal-card">
+      <div class="modal-title">Invoice Created Successfully!</div>
+      <p style="font-size: 20px;">Would you like to print / view it now?</p>
+      <div class="modal-actions">
+        <button class="btn-modal btn-yes" onclick="openPdf()">Yes</button>
+        <button class="btn-modal btn-no" onclick="goHome()">No</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let servicesData = [];
+    let itemsList = [];
+    let currentIndex = 0;
+    let isEditing = false;
+    let currentPdfUrl = "";
+
+    window.onload = function() {
+      google.script.run.withSuccessHandler(populateCustomers).getCustomerList();
+      google.script.run.withSuccessHandler(populateServices).getServiceList();
+      updateSaveButtonLabel();
+    };
+
+    function populateCustomers(list) {
+      const select = document.getElementById("customerSelect");
+      list.forEach(cust => {
+        const opt = document.createElement("option");
+        opt.value = cust;
+        opt.textContent = cust;
+        select.appendChild(opt);
+      });
+    }
+
+    function populateServices(list) {
+      servicesData = list;
+      const select = document.getElementById("serviceSelect");
+      list.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.service;
+        opt.textContent = `${s.service} ($${s.price.toFixed(2)})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function insertHashtag() {
+      const input = document.getElementById("itemNotes");
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const text = input.value;
+      input.value = text.substring(0, start) + "#" + text.substring(end);
+      input.selectionStart = input.selectionEnd = start + 1;
+      input.focus();
+    }
+
+    function updateSaveButtonLabel() {
+      const btnSave = document.getElementById("btnSave");
+      if (currentIndex < itemsList.length) {
+        btnSave.textContent = "💾 Save";
+      } else {
+        btnSave.textContent = "➕ Save & Add Next";
+      }
+    }
+
+    function saveCurrentItem() {
+      const serviceName = document.getElementById("serviceSelect").value;
+      const notes = document.getElementById("itemNotes").value.trim();
+      const qtyVal = document.getElementById("itemQty").value;
+
+      if (!serviceName) {
+        alert("Please select a service.");
+        return;
+      }
+      if (!qtyVal || Number(qtyVal) < 1) {
+        alert("Please enter a valid quantity.");
+        return;
+      }
+
+      const match = servicesData.find(s => s.service === serviceName);
+      const unitPrice = match ? match.price : 0;
+      const qty = Number(qtyVal);
+
+      const itemObj = {
+        service: serviceName,
+        notes: notes,
+        quantity: qty,
+        price: unitPrice,
+        total: unitPrice * qty
+      };
+
+      const isNewItem = (currentIndex >= itemsList.length);
+
+      if (isNewItem) {
+        itemsList.push(itemObj);
+        updatePreview();
+        clearItemForm();
+        currentIndex = itemsList.length;
+        setFieldsReadOnly(false);
+      } else {
+        itemsList[currentIndex] = itemObj;
+        updatePreview();
+        setFieldsReadOnly(true);
+      }
+
+      updateNavButtons();
+      updateSaveButtonLabel();
+    }
+
+    function setFieldsReadOnly(isReadOnly) {
+      document.getElementById("serviceSelect").disabled = isReadOnly;
+      document.getElementById("itemNotes").disabled = isReadOnly;
+      document.getElementById("itemQty").disabled = isReadOnly;
+      isEditing = !isReadOnly;
+    }
+
+    function enableEdit() {
+      setFieldsReadOnly(false);
+    }
+
+    function navigateItem(direction) {
+      const newIndex = currentIndex + direction;
+
+      if (newIndex >= 0 && newIndex <= itemsList.length) {
+        currentIndex = newIndex;
+
+        if (currentIndex < itemsList.length) {
+          const item = itemsList[currentIndex];
+          document.getElementById("serviceSelect").value = item.service;
+          document.getElementById("itemNotes").value = item.notes;
+          document.getElementById("itemQty").value = item.quantity;
+          setFieldsReadOnly(true);
+        } else {
+          clearItemForm();
+          setFieldsReadOnly(false);
+        }
+
+        updateNavButtons();
+        updateSaveButtonLabel();
+      }
+    }
+
+    function clearItemForm() {
+      document.getElementById("serviceSelect").value = "";
+      document.getElementById("itemNotes").value = "";
+      document.getElementById("itemQty").value = "";
+    }
+
+    function updateNavButtons() {
+      document.getElementById("btnPrev").disabled = (currentIndex === 0);
+      document.getElementById("btnNext").disabled = (currentIndex >= itemsList.length);
+    }
+
+    function updatePreview() {
+      const customer = document.getElementById("customerSelect").value;
+      const date = document.getElementById("serviceDate").value;
+
+      document.getElementById("prevCustomer").textContent = customer || "Not Selected";
+      document.getElementById("prevDate").textContent = date || "Not Selected";
+
+      const tbody = document.getElementById("previewTableBody");
+      tbody.innerHTML = "";
+
+      let grandTotal = 0;
+
+      if (itemsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #777;">No items added yet.</td></tr>';
+      } else {
+        itemsList.forEach((item, idx) => {
+          grandTotal += item.total;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${item.service} ${item.notes ? '(' + item.notes + ')' : ''}</td>
+            <td>${item.quantity}</td>
+            <td>$${item.price.toFixed(2)}</td>
+            <td>$${item.total.toFixed(2)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      document.getElementById("prevGrandTotal").textContent = grandTotal.toFixed(2);
+    }
+
+    function promptFinalize() {
+      const customer = document.getElementById("customerSelect").value;
+      if (!customer) {
+        alert("Please select a customer before finalizing.");
+        return;
+      }
+      if (itemsList.length === 0) {
+        alert("Please add at least one line item before finalizing.");
+        return;
+      }
+      document.getElementById("confirmModal").style.display = "flex";
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = "none";
+    }
+
+    function submitInvoice() {
+      const submitBtn = document.getElementById("btnSubmitInvoice");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating PDF...";
+
+      const invoiceData = {
+        customer: document.getElementById("customerSelect").value,
+        date: document.getElementById("serviceDate").value,
+        items: itemsList,
+        total: parseFloat(document.getElementById("prevGrandTotal").textContent)
+      };
+
+      google.script.run
+        .withSuccessHandler(onInvoiceSuccess)
+        .withFailureHandler(onInvoiceFailure)
+        .finalizeInvoice(invoiceData);
+    }
+
+    function onInvoiceSuccess(response) {
+      closeModal("confirmModal");
+      const submitBtn = document.getElementById("btnSubmitInvoice");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Yes, Submit";
+
+      if (response.success) {
+        currentPdfUrl = response.pdfUrl;
+        document.getElementById("successModal").style.display = "flex";
+      }
+    }
+
+    function onInvoiceFailure(err) {
+      closeModal("confirmModal");
+      const submitBtn = document.getElementById("btnSubmitInvoice");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Yes, Submit";
+      alert("Error generating invoice PDF: " + err.message);
+    }
+
+    function openPdf() {
+      if (currentPdfUrl) {
+        window.open(currentPdfUrl, "_blank");
+      }
+      goHome();
+    }
+
+    function goHome() {
+      google.script.run
+        .withSuccessHandler(function(htmlContent) {
+          document.open();
+          document.write(htmlContent);
+          document.close();
+        })
+        .withFailureHandler(function(err) {
+          alert("Error returning to home: " + err.message);
+        })
+        .loadPage("Index");
+    }
+  </script>
+</body>
+
+</html>

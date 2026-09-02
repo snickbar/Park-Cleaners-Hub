@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      font-family: Arial, sans-serif;
+      background: #f7f9fa;
+      color: #111111;
+    }
+
+    /* =========================
+       HEADER
+    ========================= */
+    .header {
+      background: #ffffff;
+      border-bottom: 4px solid #1a237e;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: #1a237e;
+      letter-spacing: 0.5px;
+    }
+
+    /* =========================
+       MAIN CONTAINER
+    ========================= */
+    .container {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 28px;
+    }
+
+    /* =========================
+       CARDS / BUTTON SECTIONS
+    ========================= */
+    .card {
+      border-radius: 16px;
+      padding: 36px 20px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 220px;
+      color: #1a1a1a;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+    }
+
+    .card:active {
+      transform: scale(0.98);
+    }
+
+    /* SOFT COLOR-CODED SECTIONS */
+    .card-create {
+      background: #e8f5e9; /* Soft Light Green */
+      border: 3px solid #2e7d32;
+    }
+
+    .card-view {
+      background: #e3f2fd; /* Soft Light Blue */
+      border: 3px solid #1565c0;
+    }
+
+    .card-service {
+      background: #f3e5f5; /* Soft Light Purple */
+      border: 3px solid #7b1fa2;
+    }
+
+    .card-customer {
+      background: #fff3e0; /* Soft Light Orange */
+      border: 3px solid #e65100;
+    }
+
+    .card-icon {
+      font-size: 52px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 26px;
+      font-weight: bold;
+      line-height: 1.3;
+    }
+
+    /* =========================
+       RESPONSIVE
+    ========================= */
+    @media (max-width: 750px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header-title {
+        font-size: 26px;
+      }
+
+      .card-title {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">
+      Park Cleaners Invoice Manager
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <div class="container" id="app-container">
+    <div class="grid">
+
+      <!-- SECTION 1: CREATE NEW INVOICE -->
+      <div class="card card-create" onclick="navigateTo('CreateInvoice')">
+        <div class="card-icon">➕</div>
+        <div class="card-title">Create New Invoice</div>
+      </div>
+
+      <!-- SECTION 2: VIEW PAST INVOICE -->
+      <div class="card card-view" onclick="navigateTo('ViewPastInvoice')">
+        <div class="card-icon">📄</div>
+        <div class="card-title">View Past Invoice</div>
+      </div>
+
+      <!-- SECTION 3: SERVICE AND PRICING MANAGER -->
+      <div class="card card-service" onclick="navigateTo('ServicesManager')">
+        <div class="card-icon">🏷️</div>
+        <div class="card-title">Service and Pricing Manager</div>
+      </div>
+
+      <!-- SECTION 4: CUSTOMER MANAGER -->
+      <div class="card card-customer" onclick="navigateTo('CustomersManager')">
+        <div class="card-icon">👥</div>
+        <div class="card-title">Customer Manager</div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function navigateTo(pageName) {
+      google.script.run
+        .withSuccessHandler(function(htmlContent) {
+          document.open();
+          document.write(htmlContent);
+          document.close();
+        })
+        .withFailureHandler(function(err) {
+          alert("Error loading page: " + err.message);
+        })
+        .loadPage(pageName);
+    }
+  </script>
+
+</body>
+
+</html>
