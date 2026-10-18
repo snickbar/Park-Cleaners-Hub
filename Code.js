@@ -218,10 +218,11 @@ function getCustomerList() {
   const sheet = ss.getSheetByName("Customers");
   if (!sheet) return [];
 
-  const data = sheet.getDataRange().getValues();
+  // Display values: see getInvoiceHistory on why Dates must stay out of replies
+  const data = sheet.getDataRange().getDisplayValues();
   if (data.length <= 1) return [];
 
-  return data.slice(1).map(row => row[0]).filter(String);
+  return data.slice(1).map(row => String(row[0]).trim()).filter(String);
 }
 
 /**
@@ -259,7 +260,10 @@ function getHistorySheet_() {
     sheet = ss.insertSheet("History");
     sheet.appendRow(HISTORY_HEADERS);
   } else if (sheet.getLastColumn() < HISTORY_HEADERS.length) {
-    // Older sheets predate the Sent On / Paid On columns
+    // Older sheets predate the Sent On / Paid On columns. The sheet may also
+    // have had its spare columns deleted, so make room before writing.
+    const missing = HISTORY_HEADERS.length - sheet.getMaxColumns();
+    if (missing > 0) sheet.insertColumnsAfter(sheet.getMaxColumns(), missing);
     sheet.getRange(1, 1, 1, HISTORY_HEADERS.length).setValues([HISTORY_HEADERS]);
   }
   return sheet;
@@ -665,10 +669,13 @@ function getInvoiceHistory() {
 
   let invoices = [];
   if (historySheet && historySheet.getLastRow() > 1) {
-    // Use getDisplayValues() instead of getValues() to read exact formatted cell text
+    // Use getDisplayValues() instead of getValues() to read exact formatted cell text.
+    // Read only the columns the sheet has (it may predate Sent On / Paid On).
+    const cols = Math.min(historySheet.getMaxColumns(), HISTORY_HEADERS.length);
     const data = historySheet
-      .getRange(2, 1, historySheet.getLastRow() - 1, HISTORY_HEADERS.length)
-      .getDisplayValues();
+      .getRange(2, 1, historySheet.getLastRow() - 1, cols)
+      .getDisplayValues()
+      .map(row => row.concat(new Array(HISTORY_HEADERS.length - cols).fill('')));
     invoices = data.map(row => {
       return {
         invoiceNum: row[0],
@@ -686,9 +693,11 @@ function getInvoiceHistory() {
 
   let customers = [];
   if (customerSheet) {
-    const custData = customerSheet.getDataRange().getValues();
+    // Display values, so a cell Sheets reads as a date can't put a Date in the
+    // reply (google.script.run turns a reply containing a Date into null)
+    const custData = customerSheet.getDataRange().getDisplayValues();
     if (custData.length > 1) {
-      customers = custData.slice(1).map(r => r[0]).filter(String);
+      customers = custData.slice(1).map(r => String(r[0]).trim()).filter(String);
     }
   }
 

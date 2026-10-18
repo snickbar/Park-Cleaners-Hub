@@ -442,12 +442,28 @@
       .withFailureHandler(handleError)
       .getInvoiceHistory();
 
-    function onDataLoaded(res) {
-      rawInvoices = res.invoices || [];
-      populateCustomerDropdown(res.customers || []);
+    setTimeout(function() {
+      if (rawInvoices.length === 0 && /Loading invoice history/.test(tbody.textContent)) {
+        handleError({ message: "No reply from the server after 30 seconds. Please reload and try again." });
+      }
+    }, 30000);
 
-      // Default filter & sort by most recent date first
-      filterInvoices();
+    function onDataLoaded(res) {
+      // An empty reply or a rendering error would otherwise leave the table
+      // stuck on "Loading..." with no explanation.
+      if (!res) {
+        handleError({ message: "The server sent back no data. Please reload and try again." });
+        return;
+      }
+      try {
+        rawInvoices = res.invoices || [];
+        populateCustomerDropdown(res.customers || []);
+
+        // Default filter & sort by most recent date first
+        filterInvoices();
+      } catch (err) {
+        handleError(err);
+      }
     }
 
     function populateCustomerDropdown(customers) {

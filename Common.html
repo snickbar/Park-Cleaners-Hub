@@ -9,6 +9,21 @@
   // the second visit to a screen throw before any of its code runs.
   var BASE_URL = <?!= JSON.stringify(baseUrl || "") ?>;
 
+  // Show unexpected script errors on screen, so a broken screen says why
+  // instead of silently doing nothing.
+  window.onerror = function(message, source, line) {
+    var bar = document.getElementById("appErrorBar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "appErrorBar";
+      bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#c62828;" +
+        "color:#fff;font:bold 14px Arial,sans-serif;padding:10px 16px;";
+      document.body.appendChild(bar);
+    }
+    bar.textContent = "Something went wrong: " + message + (line ? " (line " + line + ")" : "") +
+      ". Please reload, and tell the admin if it keeps happening.";
+  };
+
   // Escapes text for use in HTML content *and* quoted attributes.
   function escapeHtml(str) {
     return String(str == null ? "" : str)
