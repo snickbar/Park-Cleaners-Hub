@@ -474,6 +474,13 @@
       });
     }
 
+    // Only real web links count as PDFs. Written without a "//" sequence on
+    // purpose: Apps Script's script processing mistakes a "//" inside a
+    // regex literal for a comment and breaks the whole page script.
+    function hasPdfLink(url) {
+      return String(url || "").indexOf("https:\/\/") === 0;
+    }
+
     function findInvoice(invoiceNum) {
       return rawInvoices.find(inv => inv.invoiceNum === invoiceNum);
     }
@@ -596,7 +603,7 @@
       records.forEach(row => {
         const tr = document.createElement("tr");
         const isSelected = selected.has(row.invoiceNum);
-        const hasPdf = /^https:\/\//.test(row.pdfUrl);
+        const hasPdf = hasPdfLink(row.pdfUrl);
         if (isSelected) tr.className = "row-selected";
 
         const pdfBtn = hasPdf
@@ -659,7 +666,7 @@
     }
 
     function printableShown() {
-      return displayedInvoices.filter(inv => /^https:\/\//.test(inv.pdfUrl));
+      return displayedInvoices.filter(inv => hasPdfLink(inv.pdfUrl));
     }
 
     function toggleSelectAll(isOn) {
@@ -730,7 +737,7 @@
       if (window.PDFLib) return Promise.resolve();
       return new Promise(function(resolve, reject) {
         const s = document.createElement("script");
-        s.src = "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+        s.src = "https:\/\/unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js";
         s.onload = resolve;
         s.onerror = function() {
           reject(new Error("The PDF tool didn't load. Check your internet connection and try again."));
