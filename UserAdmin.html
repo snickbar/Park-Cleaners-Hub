@@ -202,7 +202,7 @@
 
   <div class="header">
     <div class="header-title">Park Cleaners - Users</div>
-    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top" onclick="return goHome()">🏠 Home</a>
   </div>
 
   <div class="container">
@@ -251,7 +251,7 @@
 
   <?!= commonHtml ?>
   <script>
-    let usersData = { adminEmail: "", appUrl: "", users: [] };
+    var usersData = { adminEmail: "", appUrl: "", users: [] };
 
     document.getElementById("tableContainer").addEventListener("click", function(event) {
       const btn = event.target.closest("button[data-remove]");

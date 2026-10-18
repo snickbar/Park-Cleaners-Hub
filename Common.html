@@ -1,6 +1,13 @@
 <script>
-  // Shared script, inserted into every page by doGet() as commonHtml.
-  const BASE_URL = <?!= JSON.stringify(baseUrl || "") ?>;
+  // Shared script, inserted into every page by renderPage_() as commonHtml.
+  //
+  // Screens are swapped in place with document.write() rather than by
+  // navigating, because the app is embedded in Google Sites and the embed
+  // won't let a link replace the top-level page. document.write() keeps the
+  // previous screen's global scope, so every top-level variable in the page
+  // scripts must use `var` (re-declarable) - a top-level `let`/`const` makes
+  // the second visit to a screen throw before any of its code runs.
+  var BASE_URL = <?!= JSON.stringify(baseUrl || "") ?>;
 
   // Escapes text for use in HTML content *and* quoted attributes.
   function escapeHtml(str) {
@@ -12,18 +19,22 @@
       .replace(/'/g, "&#39;");
   }
 
-  // Each screen is a real page load. Must be called from a click handler:
-  // the app's sandbox only lets a user action navigate the top window.
   function goTo(pageName) {
-    const a = document.createElement("a");
-    a.href = BASE_URL + (pageName ? "?page=" + encodeURIComponent(pageName) : "");
-    a.target = "_top";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    google.script.run
+      .withSuccessHandler(function(html) {
+        document.open();
+        document.write(html);
+        document.close();
+        window.scrollTo(0, 0);
+      })
+      .withFailureHandler(function(err) {
+        alert("Error loading page: " + err.message);
+      })
+      .loadPage(pageName || "Index");
+    return false; // when used as a link's onclick, don't follow its href
   }
 
   function goHome() {
-    goTo("");
+    return goTo("Index");
   }
 </script>

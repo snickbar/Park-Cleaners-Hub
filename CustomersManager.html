@@ -212,7 +212,7 @@
   <!-- EXACT MATCH HEADER -->
   <div class="header">
     <div class="header-title">Park Cleaners - Customer Manager</div>
-    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top" onclick="return goHome()">🏠 Home</a>
   </div>
 
   <!-- MAIN CONTAINER -->
@@ -257,9 +257,9 @@
 
   <?!= commonHtml ?>
   <script>
-    let customersData = [];
-    let currentSortColumn = 'name';
-    let currentSortDirection = 'asc';
+    var customersData = [];
+    var currentSortColumn = 'name';
+    var currentSortDirection = 'asc';
 
     // Edit/Delete buttons carry only an index into customersData; names are
     // never pasted into onclick code, so quotes in a name can't break them.

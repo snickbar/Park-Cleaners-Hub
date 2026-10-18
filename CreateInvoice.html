@@ -278,7 +278,7 @@
   <!-- HEADER BAR -->
   <div class="header-bar">
     <div class="header-title">Park Cleaners - Create Invoice</div>
-    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top" onclick="return goHome()">🏠 Home</a>
   </div>
 
   <!-- SPLIT SCREEN LAYOUT -->
@@ -392,18 +392,18 @@
       <p style="font-size: 20px;">Would you like to print / view it now?</p>
       <div class="modal-actions">
         <a class="btn-modal btn-yes" id="btnOpenPdf" href="#" target="_blank" onclick="afterOpenPdf()">Yes</a>
-        <a class="btn-modal btn-no" href="<?= baseUrl ?>" target="_top">No</a>
+        <a class="btn-modal btn-no" href="<?= baseUrl ?>" target="_top" onclick="return goHome()">No</a>
       </div>
     </div>
   </div>
 
   <?!= commonHtml ?>
   <script>
-    let servicesData = [];
-    let itemsList = [];
-    let currentIndex = 0;
-    let isEditing = false;
-    let currentPdfUrl = "";
+    var servicesData = [];
+    var itemsList = [];
+    var currentIndex = 0;
+    var isEditing = false;
+    var currentPdfUrl = "";
 
     google.script.run
       .withSuccessHandler(populateCustomers)

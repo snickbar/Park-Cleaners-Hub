@@ -212,7 +212,7 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-title">Park Cleaners - Service Manager</div>
-    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top" onclick="return goHome()">🏠 Home</a>
   </div>
 
   <!-- MAIN CONTAINER -->
@@ -262,9 +262,9 @@
 
   <?!= commonHtml ?>
   <script>
-    let servicesData = [];
-    let currentSortColumn = 'service';
-    let currentSortDirection = 'asc';
+    var servicesData = [];
+    var currentSortColumn = 'service';
+    var currentSortDirection = 'asc';
 
     // Edit/Delete buttons carry only an index into servicesData; names are
     // never pasted into onclick code, so quotes in a name can't break them.

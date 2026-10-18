@@ -104,11 +104,11 @@ function requireAdmin_() {
 
 /* =========================================================================
    PAGE SERVING
-   Each screen is a real page load (?page=Name) rather than HTML swapped in
-   with document.write(). document.write() keeps the previous screen's
-   JavaScript globals alive, so revisiting a screen re-declared its `let`
-   variables, threw a SyntaxError, and the screen never loaded its data
-   until a full refresh.
+   doGet serves the first screen (?page=Name, default Index). Moving between
+   screens then goes through loadPage(), which the browser swaps in with
+   document.write() - this keeps working inside the Google Sites embed,
+   where links aren't allowed to replace the top-level page. See the note
+   in Common.html on why page scripts declare their globals with `var`.
    ========================================================================= */
 
 function doGet(e) {
@@ -121,27 +121,11 @@ function doGet(e) {
     }
     if (!isAllowedUser_(email)) return accessDeniedPage_(email);
 
-    const admin = isAdmin_(email);
-    let pageName = (e && e.parameter && e.parameter.page) || 'Index';
-    if (!PAGES.hasOwnProperty(pageName) || (PAGES[pageName].adminOnly && !admin)) {
-      pageName = 'Index';
-    }
-
     // First admin visit: remember which Drive folder holds the invoices, so
     // staff (whose "Invoices" search would find their own folders) use it too.
-    if (admin) getInvoiceFolder_();
+    if (isAdmin_(email)) getInvoiceFolder_();
 
-    const baseUrl = ScriptApp.getService().getUrl();
-    const common = HtmlService.createTemplateFromFile('Common');
-    common.baseUrl = baseUrl;
-
-    const template = HtmlService.createTemplateFromFile(pageName);
-    template.commonHtml = common.evaluate().getContent();
-    template.baseUrl = baseUrl;
-    template.isAdmin = admin;
-    template.userEmail = email;
-
-    const output = template.evaluate();
+    const output = renderPage_((e && e.parameter && e.parameter.page) || 'Index', email);
     output.setTitle('Park Cleaners Invoice Manager');
     output.addMetaTag('viewport', 'width=device-width, initial-scale=1');
     output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -154,6 +138,31 @@ function doGet(e) {
     try { showStack = !!email && email === PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL'); } catch (e) {}
     return accessDeniedPage_(email, "Error: " + (err && (showStack ? err.stack : err.message) || err));
   }
+}
+
+/** Returns a screen's HTML for in-place navigation (see Common.html goTo). */
+function loadPage(pageName) {
+  const email = requireUser_();
+  return renderPage_(pageName, email).getContent();
+}
+
+/** Evaluates a screen's template. Unknown or forbidden pages fall back to Index. */
+function renderPage_(pageName, email) {
+  const admin = isAdmin_(email);
+  if (!PAGES.hasOwnProperty(pageName) || (PAGES[pageName].adminOnly && !admin)) {
+    pageName = 'Index';
+  }
+
+  const baseUrl = ScriptApp.getService().getUrl();
+  const common = HtmlService.createTemplateFromFile('Common');
+  common.baseUrl = baseUrl;
+
+  const template = HtmlService.createTemplateFromFile(pageName);
+  template.commonHtml = common.evaluate().getContent();
+  template.baseUrl = baseUrl;
+  template.isAdmin = admin;
+  template.userEmail = email;
+  return template.evaluate();
 }
 
 function accessDeniedPage_(email, details) {

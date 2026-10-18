@@ -169,7 +169,7 @@
       Park Cleaners Invoice Manager
     </div>
     <? if (isAdmin) { ?>
-      <a class="btn-admin" href="<?= baseUrl ?>?page=UserAdmin" target="_top">👤 Users</a>
+      <a class="btn-admin" href="<?= baseUrl ?>?page=UserAdmin" target="_top" onclick="return goTo('UserAdmin')">👤 Users</a>
     <? } ?>
   </div>
 
@@ -178,25 +178,25 @@
     <div class="grid">
 
       <!-- SECTION 1: CREATE NEW INVOICE -->
-      <a class="card card-create" href="<?= baseUrl ?>?page=CreateInvoice" target="_top">
+      <a class="card card-create" href="<?= baseUrl ?>?page=CreateInvoice" target="_top" onclick="return goTo('CreateInvoice')">
         <div class="card-icon">➕</div>
         <div class="card-title">Create New Invoice</div>
       </a>
 
       <!-- SECTION 2: VIEW PAST INVOICE -->
-      <a class="card card-view" href="<?= baseUrl ?>?page=ViewPastInvoice" target="_top">
+      <a class="card card-view" href="<?= baseUrl ?>?page=ViewPastInvoice" target="_top" onclick="return goTo('ViewPastInvoice')">
         <div class="card-icon">📄</div>
         <div class="card-title">View Past Invoice</div>
       </a>
 
       <!-- SECTION 3: SERVICE AND PRICING MANAGER -->
-      <a class="card card-service" href="<?= baseUrl ?>?page=ServicesManager" target="_top">
+      <a class="card card-service" href="<?= baseUrl ?>?page=ServicesManager" target="_top" onclick="return goTo('ServicesManager')">
         <div class="card-icon">🏷️</div>
         <div class="card-title">Service and Pricing Manager</div>
       </a>
 
       <!-- SECTION 4: CUSTOMER MANAGER -->
-      <a class="card card-customer" href="<?= baseUrl ?>?page=CustomersManager" target="_top">
+      <a class="card card-customer" href="<?= baseUrl ?>?page=CustomersManager" target="_top" onclick="return goTo('CustomersManager')">
         <div class="card-icon">👥</div>
         <div class="card-title">Customer Manager</div>
       </a>
@@ -205,6 +205,7 @@
   </div>
 
 
+  <?!= commonHtml ?>
 </body>
 
 </html>

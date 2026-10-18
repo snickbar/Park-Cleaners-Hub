@@ -325,7 +325,7 @@
   <!-- HEADER BAR -->
   <div class="header-bar">
     <div class="header-title">Park Cleaners - View Past Invoices</div>
-    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top" onclick="return goHome()">🏠 Home</a>
   </div>
 
   <div class="main-container">
@@ -413,19 +413,19 @@
 
   <?!= commonHtml ?>
   <script>
-    let rawInvoices = [];
-    let displayedInvoices = [];
-    let currentSortField = 'date'; // Default: Sort by Date
-    let isAscending = false;        // Default: Most recent date first
+    var rawInvoices = [];
+    var displayedInvoices = [];
+    var currentSortField = 'date'; // Default: Sort by Date
+    var isAscending = false;        // Default: Most recent date first
 
     // Invoice numbers ticked for bulk printing. Kept across filter changes,
     // so you can search for one customer, tick some, search another, etc.
-    const selected = new Set();
-    const MAX_BULK = 100;
-    const PDFS_PER_REQUEST = 5;
-    let isBulkBusy = false;
+    var selected = new Set();
+    var MAX_BULK = 100;
+    var PDFS_PER_REQUEST = 5;
+    var isBulkBusy = false;
 
-    const tbody = document.getElementById("invoiceTableBody");
+    var tbody = document.getElementById("invoiceTableBody");
     tbody.addEventListener("click", function(event) {
       const btn = event.target.closest("button[data-status]");
       if (btn) toggleStatus(btn.dataset.num, btn.dataset.status, btn);
