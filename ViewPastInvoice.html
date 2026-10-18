@@ -176,7 +176,145 @@
       font-size: 18px;
       color: #777;
     }
+
+    /* SELECTION / BULK PRINT TOOLBAR */
+    .bulk-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .bulk-count {
+      font-size: 16px;
+      font-weight: bold;
+      color: #0d47a1;
+    }
+
+    .btn-bulk {
+      height: 42px;
+      padding: 0 18px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #1976d2;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn-bulk:hover:not(:disabled) {
+      background: #0d47a1;
+    }
+
+    .btn-bulk:disabled {
+      background: #9e9e9e;
+      cursor: default;
+    }
+
+    .bulk-status {
+      font-size: 15px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .col-select {
+      width: 44px;
+      text-align: center !important;
+    }
+
+    .col-select input {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    tr.row-selected td {
+      background: #e3f2fd;
+    }
+
+    /* ACTION BUTTONS */
+    .actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn-status {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      border: 2px solid #888;
+      background: #fff;
+      color: #333;
+      white-space: nowrap;
+    }
+
+    .btn-status:hover:not(:disabled) {
+      background: #f0f0f0;
+    }
+
+    .btn-status.done-sent {
+      border-color: #ef6c00;
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    .btn-status.done-paid {
+      border-color: #2e7d32;
+      background: #e8f5e9;
+      color: #1b5e20;
+    }
+
+    .btn-status:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    /* BULK PRINT RESULT MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 32px;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #0d47a1;
+      margin-bottom: 10px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .modal-actions a, .modal-actions button {
+      font-size: 17px;
+      padding: 10px 20px;
+    }
   </style>
+  <!-- Merges selected invoice PDFs into one file for bulk printing -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 
 <body>
@@ -223,11 +361,22 @@
       </div>
     </div>
 
+    <!-- SELECTION / BULK PRINT -->
+    <div class="bulk-bar">
+      <span class="bulk-count" id="selectedCount">0 selected</span>
+      <button class="btn-bulk" id="btnBulkPrint" onclick="bulkPrint()" disabled>🖨️ Print Selected</button>
+      <button class="btn-clear" id="btnClearSelection" onclick="clearSelection()" disabled>Clear Selection</button>
+      <span class="bulk-status" id="bulkStatus"></span>
+    </div>
+
     <!-- INVOICE LIST TABLE -->
     <div class="table-container">
       <table class="invoice-table">
         <thead>
           <tr>
+            <th class="col-select" style="cursor: default;" title="Select all shown">
+              <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this.checked)">
+            </th>
             <th onclick="sortTable('invoiceNum')">Invoice # <span id="sort_invoiceNum"></span></th>
             <th onclick="sortTable('date')">Date Issued <span id="sort_date"></span></th>
             <th onclick="sortTable('customer')">Customer <span id="sort_customer"></span></th>
@@ -238,7 +387,7 @@
         </thead>
         <tbody id="invoiceTableBody">
           <tr>
-            <td colspan="6" class="no-data">Loading invoice history...</td>
+            <td colspan="7" class="no-data">Loading invoice history...</td>
           </tr>
         </tbody>
       </table>
@@ -246,23 +395,54 @@
 
   </div>
 
+  <!-- BULK PRINT READY -->
+  <div class="modal-overlay" id="bulkModal">
+    <div class="modal-card">
+      <div class="modal-title">Combined PDF Ready</div>
+      <p style="font-size: 17px;" id="bulkModalText"></p>
+      <p style="font-size: 15px; color: #555;">Open it, then use the print button to print every invoice at once.</p>
+      <div class="modal-actions">
+        <a class="btn-pdf" id="bulkPdfLink" href="#" target="_blank" onclick="closeBulkModal()">🖨️ Open &amp; Print</a>
+        <button class="btn-clear" onclick="closeBulkModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <?!= include_('Common', { baseUrl: baseUrl }) ?>
   <script>
     let rawInvoices = [];
     let displayedInvoices = [];
     let currentSortField = 'date'; // Default: Sort by Date
     let isAscending = false;        // Default: Most recent date first
 
-    window.onload = function() {
-      google.script.run
-        .withSuccessHandler(onDataLoaded)
-        .withFailureHandler(handleError)
-        .getInvoiceHistory();
-    };
+    // Invoice numbers ticked for bulk printing. Kept across filter changes,
+    // so you can search for one customer, tick some, search another, etc.
+    const selected = new Set();
+    const MAX_BULK = 100;
+    const PDFS_PER_REQUEST = 5;
+    let isBulkBusy = false;
+
+    const tbody = document.getElementById("invoiceTableBody");
+    tbody.addEventListener("click", function(event) {
+      const btn = event.target.closest("button[data-status]");
+      if (btn) toggleStatus(btn.dataset.num, btn.dataset.status, btn);
+    });
+    tbody.addEventListener("change", function(event) {
+      if (event.target.matches("input[data-select]")) {
+        setSelected(event.target.dataset.select, event.target.checked);
+        renderTable(displayedInvoices);
+      }
+    });
+
+    google.script.run
+      .withSuccessHandler(onDataLoaded)
+      .withFailureHandler(handleError)
+      .getInvoiceHistory();
 
     function onDataLoaded(res) {
       rawInvoices = res.invoices || [];
       populateCustomerDropdown(res.customers || []);
-      
+
       // Default filter & sort by most recent date first
       filterInvoices();
     }
@@ -275,6 +455,10 @@
         opt.textContent = cust;
         select.appendChild(opt);
       });
+    }
+
+    function findInvoice(invoiceNum) {
+      return rawInvoices.find(inv => inv.invoiceNum === invoiceNum);
     }
 
     function filterInvoices() {
@@ -330,21 +514,21 @@
           valB = parseFloat(valB) || 0;
           if (valA < valB) result = -1;
           if (valA > valB) result = 1;
-        } 
+        }
         // Date comparison
         else if (currentSortField === 'date') {
           valA = parseDateValue(valA);
           valB = parseDateValue(valB);
           if (valA < valB) result = -1;
           if (valA > valB) result = 1;
-          
+
           // Fallback to highest invoice number if dates match
           if (result === 0) {
             const numA = parseFloat(a.invoiceNum) || 0;
             const numB = parseFloat(b.invoiceNum) || 0;
             return isAscending ? (numA - numB) : (numB - numA);
           }
-        } 
+        }
         // String comparison
         else {
           valA = valA.toString().toLowerCase();
@@ -372,31 +556,208 @@
       });
     }
 
+    function statusButton(row, field) {
+      const done = !!row[field];
+      const labels = {
+        sent: done ? `✓ Sent ${row.sent}` : '✉️ Mark as Sent',
+        paid: done ? `✓ Paid ${row.paid}` : '💲 Mark as Paid'
+      };
+      return `<button class="btn-status${done ? ' done-' + field : ''}"
+                data-status="${field}" data-num="${escapeHtml(row.invoiceNum)}"
+                title="${done ? 'Click to undo' : ''}">${escapeHtml(labels[field])}</button>`;
+    }
+
     function renderTable(records) {
-      const tbody = document.getElementById("invoiceTableBody");
       tbody.innerHTML = "";
 
       if (records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No matching invoices found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No matching invoices found.</td></tr>';
+        updateSelectionUI();
         return;
       }
 
       records.forEach(row => {
         const tr = document.createElement("tr");
-        const pdfBtn = row.pdfUrl 
-          ? `<a href="${row.pdfUrl}" target="_blank" class="btn-pdf">📄 View PDF</a>` 
-          : `<span style="color:#aaa;">N/A</span>`;
+        const isSelected = selected.has(row.invoiceNum);
+        const hasPdf = /^https:\/\//.test(row.pdfUrl);
+        if (isSelected) tr.className = "row-selected";
+
+        const pdfBtn = hasPdf
+          ? `<a href="${escapeHtml(row.pdfUrl)}" target="_blank" class="btn-pdf">📄 View PDF</a>`
+          : `<span style="color:#aaa;">No PDF</span>`;
+        const selectBox = hasPdf
+          ? `<input type="checkbox" data-select="${escapeHtml(row.invoiceNum)}" ${isSelected ? 'checked' : ''}>`
+          : '';
 
         tr.innerHTML = `
-          <td><strong>#${row.invoiceNum}</strong></td>
-          <td>${row.date}</td>
-          <td><strong>${row.customer}</strong></td>
-          <td>${row.items}</td>
-          <td><strong>$${row.total}</strong></td>
-          <td>${pdfBtn}</td>
+          <td class="col-select">${selectBox}</td>
+          <td><strong>#${escapeHtml(row.invoiceNum)}</strong></td>
+          <td>${escapeHtml(row.date)}</td>
+          <td><strong>${escapeHtml(row.customer)}</strong></td>
+          <td>${escapeHtml(row.items)}</td>
+          <td><strong>$${(parseFloat(row.total) || 0).toFixed(2)}</strong></td>
+          <td><div class="actions">${pdfBtn}${statusButton(row, 'sent')}${statusButton(row, 'paid')}</div></td>
         `;
         tbody.appendChild(tr);
       });
+
+      updateSelectionUI();
+    }
+
+    /* ---------- Mark as sent / paid ---------- */
+
+    function toggleStatus(invoiceNum, field, btn) {
+      const inv = findInvoice(invoiceNum);
+      if (!inv) return;
+      const isDone = !!inv[field];
+      if (isDone && !confirm(`Undo "${field}" for invoice #${invoiceNum}?`)) return;
+
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+      google.script.run
+        .withSuccessHandler(function(value) {
+          inv[field] = value;
+          renderTable(displayedInvoices);
+        })
+        .withFailureHandler(function(err) {
+          alert("Couldn't update invoice #" + invoiceNum + ": " + err.message);
+          renderTable(displayedInvoices);
+        })
+        .setInvoiceStatus(invoiceNum, field, !isDone);
+    }
+
+    /* ---------- Selection ---------- */
+
+    function setSelected(invoiceNum, isOn) {
+      if (isOn) {
+        if (selected.size >= MAX_BULK) {
+          alert(`You can bulk print up to ${MAX_BULK} invoices at a time.`);
+          return false;
+        }
+        selected.add(invoiceNum);
+      } else {
+        selected.delete(invoiceNum);
+      }
+      return true;
+    }
+
+    function printableShown() {
+      return displayedInvoices.filter(inv => /^https:\/\//.test(inv.pdfUrl));
+    }
+
+    function toggleSelectAll(isOn) {
+      for (const inv of printableShown()) {
+        if (!setSelected(inv.invoiceNum, isOn)) break;
+      }
+      renderTable(displayedInvoices);
+    }
+
+    function clearSelection() {
+      selected.clear();
+      renderTable(displayedInvoices);
+    }
+
+    function updateSelectionUI() {
+      const shown = printableShown();
+      const shownSelected = shown.filter(inv => selected.has(inv.invoiceNum)).length;
+      const hidden = selected.size - shownSelected;
+
+      document.getElementById("selectedCount").textContent =
+        `${selected.size} selected` + (hidden > 0 ? ` (${hidden} hidden by filters)` : '');
+      document.getElementById("btnBulkPrint").disabled = selected.size === 0 || isBulkBusy;
+      document.getElementById("btnClearSelection").disabled = selected.size === 0 || isBulkBusy;
+
+      const selectAll = document.getElementById("selectAll");
+      selectAll.checked = shown.length > 0 && shownSelected === shown.length;
+      selectAll.indeterminate = shownSelected > 0 && shownSelected < shown.length;
+    }
+
+    /* ---------- Bulk print ----------
+       Fetches each selected invoice's PDF, merges them into one PDF in the
+       browser (pdf-lib), saves that to Drive, and opens it so the whole
+       batch prints with a single print command. */
+
+
+    function runServer(fnName, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)[fnName](...args);
+      });
+    }
+
+    function base64ToBytes(b64) {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+
+    function bytesToBase64(bytes) {
+      let bin = "";
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      return btoa(bin);
+    }
+
+    function setBulkStatus(text) {
+      document.getElementById("bulkStatus").textContent = text;
+    }
+
+    async function bulkPrint() {
+      if (selected.size === 0 || isBulkBusy) return;
+      if (!window.PDFLib) {
+        alert("The PDF tool didn't load. Check your internet connection and reload the page.");
+        return;
+      }
+
+      // Print in the order shown on screen; selected-but-filtered-out
+      // invoices go last, by invoice number.
+      const order = new Map(displayedInvoices.map((inv, i) => [inv.invoiceNum, i]));
+      const nums = Array.from(selected).sort((a, b) => {
+        const ia = order.has(a) ? order.get(a) : Infinity;
+        const ib = order.has(b) ? order.get(b) : Infinity;
+        return ia !== ib ? ia - ib : (parseFloat(a) || 0) - (parseFloat(b) || 0);
+      });
+
+      isBulkBusy = true;
+      updateSelectionUI();
+      try {
+        const merged = await PDFLib.PDFDocument.create();
+        for (let i = 0; i < nums.length; i += PDFS_PER_REQUEST) {
+          const batch = nums.slice(i, i + PDFS_PER_REQUEST);
+          setBulkStatus(`Loading invoices ${i + 1}-${i + batch.length} of ${nums.length}...`);
+          const pdfs = await runServer("getInvoicePdfs", batch);
+          for (const pdf of pdfs) {
+            const doc = await PDFLib.PDFDocument.load(base64ToBytes(pdf.data));
+            const pages = await merged.copyPages(doc, doc.getPageIndices());
+            pages.forEach(page => merged.addPage(page));
+          }
+        }
+
+        setBulkStatus("Combining...");
+        const mergedBytes = await merged.save();
+
+        setBulkStatus("Saving combined PDF...");
+        const url = await runServer("saveBulkPrintPdf", bytesToBase64(mergedBytes), nums.length);
+
+        document.getElementById("bulkModalText").textContent =
+          `${nums.length} invoice${nums.length === 1 ? '' : 's'} combined into one PDF.`;
+        document.getElementById("bulkPdfLink").href = url;
+        document.getElementById("bulkModal").style.display = "flex";
+      } catch (err) {
+        alert("Bulk print failed: " + (err && err.message ? err.message : err));
+      } finally {
+        isBulkBusy = false;
+        setBulkStatus("");
+        updateSelectionUI();
+      }
+    }
+
+    function closeBulkModal() {
+      document.getElementById("bulkModal").style.display = "none";
     }
 
     function clearSearch() {
@@ -408,21 +769,8 @@
     }
 
     function handleError(err) {
-      document.getElementById("invoiceTableBody").innerHTML = 
-        `<tr><td colspan="6" class="no-data" style="color:red;">Error loading history: ${err.message}</td></tr>`;
-    }
-
-    function goHome() {
-      google.script.run
-        .withSuccessHandler(function(htmlContent) {
-          document.open();
-          document.write(htmlContent);
-          document.close();
-        })
-        .withFailureHandler(function(err) {
-          alert("Error returning to home: " + err.message);
-        })
-        .loadPage("Index");
+      tbody.innerHTML =
+        `<tr><td colspan="7" class="no-data" style="color:red;">Error loading history: ${escapeHtml(err.message)}</td></tr>`;
     }
   </script>
 </body>

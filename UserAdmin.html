@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f9fa;
+      color: #111111;
+      margin: 0;
+      padding: 0;
+    }
+
+    .header {
+      background-color: transparent;
+      padding: 15px 20px 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #1a237e;
+      margin-bottom: 25px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1a237e;
+    }
+
+    .btn-home {
+      background-color: #e0e0e0;
+      color: #000000;
+      border: 1px solid #9e9e9e;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-home:hover {
+      background-color: #d6d6d6;
+    }
+
+    .container {
+      max-width: 950px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 2px solid #1a237e;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #1a237e;
+    }
+
+    .help-text {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.5;
+      margin: 0 0 14px 0;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group label {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #1a237e;
+    }
+
+    .form-group input {
+      padding: 8px 12px;
+      font-size: 15px;
+      border: 1px solid #1a237e;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .btn-submit {
+      background: #1a237e;
+      color: #ffffff;
+      border: none;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: #0d1458;
+    }
+
+    .btn-submit:disabled {
+      background: #9e9e9e;
+      cursor: default;
+    }
+
+    .app-link-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .app-link-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 12px;
+      font-size: 14px;
+      border: 1px solid #9e9e9e;
+      border-radius: 6px;
+      background: #f5f5f5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th {
+      background: #e8eaf6;
+      color: #1a237e;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .actions-cell {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .btn-delete {
+      background: #c62828;
+      color: #ffffff;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .badge-admin {
+      background: #e8eaf6;
+      color: #1a237e;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .loading-text {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <div class="header-title">Park Cleaners - Users</div>
+    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+  </div>
+
+  <div class="container">
+
+    <!-- ADD USER -->
+    <div class="card">
+      <div class="card-title">Give Someone Access</div>
+      <p class="help-text">
+        Enter their Google account email (Gmail or Google Workspace). This shares the
+        invoice spreadsheet and Invoices folder with them and lets them sign in to this app.
+      </p>
+      <form id="userForm" onsubmit="handleAddUser(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="userEmail">Google Account Email</label>
+            <input type="email" id="userEmail" placeholder="e.g. staff.member@gmail.com" required>
+          </div>
+          <button type="submit" class="btn-submit" id="addBtn">Add User</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- APP LINK -->
+    <div class="card">
+      <div class="card-title">App Link</div>
+      <p class="help-text">
+        Send new users this link. The first time they open it, Google asks them to sign in and
+        approve the app's permissions; it may warn that the app isn't verified - they can click
+        "Advanced" and continue.
+      </p>
+      <div class="app-link-row">
+        <input type="text" id="appUrl" readonly>
+        <button type="button" class="btn-submit" onclick="copyAppUrl()" id="copyBtn">Copy</button>
+      </div>
+    </div>
+
+    <!-- USER LIST -->
+    <div class="card">
+      <div class="card-title">People With Access</div>
+      <div id="tableContainer">
+        <div class="loading-text">Loading users...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <?!= include_('Common', { baseUrl: baseUrl }) ?>
+  <script>
+    let usersData = { adminEmail: "", appUrl: "", users: [] };
+
+    document.getElementById("tableContainer").addEventListener("click", function(event) {
+      const btn = event.target.closest("button[data-remove]");
+      if (btn) removeUser(btn.dataset.remove);
+    });
+
+    loadUsers();
+
+    function loadUsers() {
+      google.script.run
+        .withSuccessHandler(onUsersLoaded)
+        .withFailureHandler(showLoadError)
+        .getUsers();
+    }
+
+    function onUsersLoaded(data) {
+      usersData = data;
+      document.getElementById("appUrl").value = data.appUrl || "";
+      renderUsers();
+    }
+
+    function showLoadError(err) {
+      document.getElementById("tableContainer").innerHTML =
+        '<div class="loading-text" style="color: #c62828;">Failed to load users: ' + escapeHtml(err.message) + '</div>';
+    }
+
+    function renderUsers() {
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Added On</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>${escapeHtml(usersData.adminEmail)}</strong></td>
+              <td>-</td>
+              <td class="actions-cell"><span class="badge-admin">Admin (you)</span></td>
+            </tr>
+      `;
+
+      usersData.users.forEach(function(user) {
+        html += `
+          <tr>
+            <td><strong>${escapeHtml(user.email)}</strong></td>
+            <td>${escapeHtml(user.addedOn)}</td>
+            <td class="actions-cell">
+              <button class="btn-delete" data-remove="${escapeHtml(user.email)}">Remove</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+      if (usersData.users.length === 0) {
+        html += '<div class="loading-text">No other users yet. Add one above.</div>';
+      }
+
+      document.getElementById("tableContainer").innerHTML = html;
+    }
+
+    function handleAddUser(event) {
+      event.preventDefault();
+      const input = document.getElementById("userEmail");
+      const email = input.value.trim();
+      if (!email) return;
+
+      const addBtn = document.getElementById("addBtn");
+      addBtn.disabled = true;
+      addBtn.innerText = "Adding...";
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          input.value = "";
+          addBtn.disabled = false;
+          addBtn.innerText = "Add User";
+          onUsersLoaded(data);
+        })
+        .withFailureHandler(function(err) {
+          alert("Couldn't add user: " + err.message);
+          addBtn.disabled = false;
+          addBtn.innerText = "Add User";
+        })
+        .addUser(email);
+    }
+
+    function removeUser(email) {
+      if (!confirm(`Remove access for ${email}?\n\nThey will no longer be able to open the app, the spreadsheet, or the Invoices folder.`)) return;
+
+      google.script.run
+        .withSuccessHandler(onUsersLoaded)
+        .withFailureHandler(function(err) {
+          alert("Couldn't remove user: " + err.message);
+          loadUsers();
+        })
+        .removeUser(email);
+    }
+
+    function copyAppUrl() {
+      const input = document.getElementById("appUrl");
+      input.select();
+      const done = () => {
+        const btn = document.getElementById("copyBtn");
+        btn.innerText = "Copied!";
+        setTimeout(() => btn.innerText = "Copy", 1500);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(input.value).then(done, () => document.execCommand("copy") && done());
+      } else if (document.execCommand("copy")) {
+        done();
+      }
+    }
+  </script>
+
+</body>
+
+</html>

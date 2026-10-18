@@ -220,6 +220,7 @@
       <div class="card-title" id="form-header">Add New Service</div>
       <form id="serviceForm" onsubmit="handleFormSubmit(event)">
         <input type="hidden" id="rowIndex" value="">
+        <input type="hidden" id="originalService" value="">
 
         <div class="form-grid">
           <div class="form-group">
@@ -256,24 +257,24 @@
 
   </div>
 
+  <?!= include_('Common', { baseUrl: baseUrl }) ?>
   <script>
     let servicesData = [];
     let currentSortColumn = 'service';
     let currentSortDirection = 'asc';
 
-    window.onload = function() {
-      loadServices();
-    };
+    // Edit/Delete buttons carry only an index into servicesData; names are
+    // never pasted into onclick code, so quotes in a name can't break them.
+    document.getElementById("tableContainer").addEventListener("click", function(event) {
+      const btn = event.target.closest("button[data-action]");
+      if (!btn) return;
+      const item = servicesData[Number(btn.dataset.idx)];
+      if (!item) return;
+      if (btn.dataset.action === "edit") editService(item);
+      if (btn.dataset.action === "delete") deleteServiceRow(item);
+    });
 
-    function goHome() {
-      google.script.run
-        .withSuccessHandler(function(html) {
-          document.open();
-          document.write(html);
-          document.close();
-        })
-        .loadPage("Index");
-    }
+    loadServices();
 
     function loadServices() {
       google.script.run
@@ -282,8 +283,8 @@
           renderServicesTable();
         })
         .withFailureHandler(function(err) {
-          document.getElementById("tableContainer").innerHTML = 
-            '<div class="loading-text" style="color: #c62828;">Failed to load services: ' + err.message + '</div>';
+          document.getElementById("tableContainer").innerHTML =
+            '<div class="loading-text" style="color: #c62828;">Failed to load services: ' + escapeHtml(err.message) + '</div>';
         })
         .getServicesData();
     }
@@ -314,10 +315,12 @@
         return;
       }
 
-      // Filter services based on search input
-      let filteredData = servicesData.filter(function(item) {
-        return (item.service || '').toLowerCase().includes(filterValue);
-      });
+      // Filter services based on search input, remembering each one's index
+      let filteredData = servicesData
+        .map(function(item, idx) { return { item: item, idx: idx }; })
+        .filter(function(entry) {
+          return (entry.item.service || '').toLowerCase().includes(filterValue);
+        });
 
       if (filteredData.length === 0) {
         container.innerHTML = '<div class="loading-text">No matching services found.</div>';
@@ -328,11 +331,11 @@
       filteredData.sort(function(a, b) {
         let valA, valB;
         if (currentSortColumn === 'price') {
-          valA = cleanPrice(a.price);
-          valB = cleanPrice(b.price);
+          valA = cleanPrice(a.item.price);
+          valB = cleanPrice(b.item.price);
         } else {
-          valA = (a.service || '').toLowerCase();
-          valB = (b.service || '').toLowerCase();
+          valA = (a.item.service || '').toLowerCase();
+          valB = (b.item.service || '').toLowerCase();
         }
 
         if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
@@ -355,18 +358,16 @@
           <tbody>
       `;
 
-      filteredData.forEach(function(item) {
-        const numericPrice = cleanPrice(item.price);
-        const formattedPriceDisplay = '$' + numericPrice.toFixed(2);
-        const escapedService = (item.service || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      filteredData.forEach(function(entry) {
+        const formattedPriceDisplay = '$' + cleanPrice(entry.item.price).toFixed(2);
 
         html += `
           <tr>
-            <td><strong>${item.service}</strong></td>
+            <td><strong>${escapeHtml(entry.item.service)}</strong></td>
             <td>${formattedPriceDisplay}</td>
             <td class="actions-cell">
-              <button class="btn-edit" onclick="editService(${item.rowIndex}, '${escapedService}', ${numericPrice})">Edit</button>
-              <button class="btn-delete" onclick="deleteServiceRow(${item.rowIndex}, '${escapedService}')">Delete</button>
+              <button class="btn-edit" data-action="edit" data-idx="${entry.idx}">Edit</button>
+              <button class="btn-delete" data-action="delete" data-idx="${entry.idx}">Delete</button>
             </td>
           </tr>
         `;
@@ -395,6 +396,7 @@
 
       const data = {
         rowIndex: rowIndex ? parseInt(rowIndex) : null,
+        originalService: document.getElementById("originalService").value,
         service: service,
         price: parseFloat(price)
       };
@@ -406,16 +408,17 @@
         })
         .withFailureHandler(function(err) {
           alert("Error saving service: " + err.message);
-          saveBtn.disabled = false;
-          saveBtn.innerText = "Save Service";
+          resetForm();
+          loadServices();
         })
         .saveService(data);
     }
 
-    function editService(rowIndex, serviceName, priceNum) {
-      document.getElementById("rowIndex").value = rowIndex;
-      document.getElementById("serviceName").value = serviceName;
-      document.getElementById("servicePrice").value = priceNum.toFixed(2);
+    function editService(item) {
+      document.getElementById("rowIndex").value = item.rowIndex;
+      document.getElementById("originalService").value = item.service;
+      document.getElementById("serviceName").value = item.service;
+      document.getElementById("servicePrice").value = cleanPrice(item.price).toFixed(2);
 
       document.getElementById("form-header").innerText = "Edit Service";
       document.getElementById("saveBtn").innerText = "Update Service";
@@ -426,6 +429,7 @@
 
     function resetForm() {
       document.getElementById("rowIndex").value = "";
+      document.getElementById("originalService").value = "";
       document.getElementById("serviceName").value = "";
       document.getElementById("servicePrice").value = "";
 
@@ -435,16 +439,17 @@
       document.getElementById("cancelBtn").style.display = "none";
     }
 
-    function deleteServiceRow(rowIndex, serviceName) {
-      if (confirm(`Are you sure you want to delete "${serviceName}"?`)) {
+    function deleteServiceRow(item) {
+      if (confirm(`Are you sure you want to delete "${item.service}"?`)) {
         google.script.run
           .withSuccessHandler(function() {
             loadServices();
           })
           .withFailureHandler(function(err) {
             alert("Error deleting service: " + err.message);
+            loadServices();
           })
-          .deleteService(rowIndex);
+          .deleteService(item.rowIndex, item.service);
       }
     }
   </script>

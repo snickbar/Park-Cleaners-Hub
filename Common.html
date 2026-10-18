@@ -1,0 +1,29 @@
+<script>
+  // Shared by every page via <?!= include_('Common', { baseUrl: baseUrl }) ?>
+  const BASE_URL = <?!= JSON.stringify(baseUrl).replace(/</g, '\\u003c') ?>;
+
+  // Escapes text for use in HTML content *and* quoted attributes.
+  function escapeHtml(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // Each screen is a real page load. Must be called from a click handler:
+  // the app's sandbox only lets a user action navigate the top window.
+  function goTo(pageName) {
+    const a = document.createElement("a");
+    a.href = BASE_URL + (pageName ? "?page=" + encodeURIComponent(pageName) : "");
+    a.target = "_top";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function goHome() {
+    goTo("");
+  }
+</script>

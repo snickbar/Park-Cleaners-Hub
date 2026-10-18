@@ -390,6 +390,7 @@
     </div>
   </div>
 
+  <?!= include_('Common', { baseUrl: baseUrl }) ?>
   <script>
     let servicesData = [];
     let itemsList = [];
@@ -397,11 +398,15 @@
     let isEditing = false;
     let currentPdfUrl = "";
 
-    window.onload = function() {
-      google.script.run.withSuccessHandler(populateCustomers).getCustomerList();
-      google.script.run.withSuccessHandler(populateServices).getServiceList();
-      updateSaveButtonLabel();
-    };
+    google.script.run
+      .withSuccessHandler(populateCustomers)
+      .withFailureHandler(err => alert("Error loading customers: " + err.message))
+      .getCustomerList();
+    google.script.run
+      .withSuccessHandler(populateServices)
+      .withFailureHandler(err => alert("Error loading services: " + err.message))
+      .getServiceList();
+    updateSaveButtonLabel();
 
     function populateCustomers(list) {
       const select = document.getElementById("customerSelect");
@@ -551,7 +556,7 @@
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>${idx + 1}</td>
-            <td>${item.service} ${item.notes ? '(' + item.notes + ')' : ''}</td>
+            <td>${escapeHtml(item.service)} ${item.notes ? '(' + escapeHtml(item.notes) + ')' : ''}</td>
             <td>${item.quantity}</td>
             <td>$${item.price.toFixed(2)}</td>
             <td>$${item.total.toFixed(2)}</td>
@@ -623,19 +628,6 @@
         window.open(currentPdfUrl, "_blank");
       }
       goHome();
-    }
-
-    function goHome() {
-      google.script.run
-        .withSuccessHandler(function(htmlContent) {
-          document.open();
-          document.write(htmlContent);
-          document.close();
-        })
-        .withFailureHandler(function(err) {
-          alert("Error returning to home: " + err.message);
-        })
-        .loadPage("Index");
     }
   </script>
 </body>

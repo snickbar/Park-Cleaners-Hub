@@ -220,6 +220,7 @@
       <div class="card-title" id="form-header">Add New Customer</div>
       <form id="customerForm" onsubmit="handleFormSubmit(event)">
         <input type="hidden" id="rowIndex" value="">
+        <input type="hidden" id="originalName" value="">
 
         <div class="form-grid">
           <div class="form-group">
@@ -251,24 +252,24 @@
 
   </div>
 
+  <?!= include_('Common', { baseUrl: baseUrl }) ?>
   <script>
     let customersData = [];
     let currentSortColumn = 'name';
     let currentSortDirection = 'asc';
 
-    window.onload = function() {
-      loadCustomers();
-    };
+    // Edit/Delete buttons carry only an index into customersData; names are
+    // never pasted into onclick code, so quotes in a name can't break them.
+    document.getElementById("tableContainer").addEventListener("click", function(event) {
+      const btn = event.target.closest("button[data-action]");
+      if (!btn) return;
+      const item = customersData[Number(btn.dataset.idx)];
+      if (!item) return;
+      if (btn.dataset.action === "edit") editCustomer(item);
+      if (btn.dataset.action === "delete") deleteCustomerRow(item);
+    });
 
-    function goHome() {
-      google.script.run
-        .withSuccessHandler(function(html) {
-          document.open();
-          document.write(html);
-          document.close();
-        })
-        .loadPage("Index");
-    }
+    loadCustomers();
 
     function loadCustomers() {
       google.script.run
@@ -277,7 +278,7 @@
           renderCustomersTable();
         })
         .withFailureHandler(function(err) {
-          document.getElementById("tableContainer").innerHTML = '<div class="loading-text" style="color: red;">Failed to load customers: ' + err.message + '</div>';
+          document.getElementById("tableContainer").innerHTML = '<div class="loading-text" style="color: red;">Failed to load customers: ' + escapeHtml(err.message) + '</div>';
         })
         .getCustomersData();
     }
@@ -301,10 +302,12 @@
         return;
       }
 
-      // Filter customers based on search input
-      let filteredData = customersData.filter(function(item) {
-        return (item.name || '').toLowerCase().includes(filterValue);
-      });
+      // Filter customers based on search input, remembering each one's index
+      let filteredData = customersData
+        .map(function(item, idx) { return { item: item, idx: idx }; })
+        .filter(function(entry) {
+          return (entry.item.name || '').toLowerCase().includes(filterValue);
+        });
 
       if (filteredData.length === 0) {
         container.innerHTML = '<div class="loading-text">No matching customers found.</div>';
@@ -313,8 +316,8 @@
 
       // Sort filtered data
       filteredData.sort(function(a, b) {
-        let valA = (a[currentSortColumn] || '').toString().toLowerCase();
-        let valB = (b[currentSortColumn] || '').toString().toLowerCase();
+        let valA = (a.item[currentSortColumn] || '').toString().toLowerCase();
+        let valB = (b.item[currentSortColumn] || '').toString().toLowerCase();
 
         if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
         if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
@@ -334,14 +337,13 @@
           <tbody>
       `;
 
-      filteredData.forEach(function(item) {
-        const escapedName = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      filteredData.forEach(function(entry) {
         html += `
           <tr>
-            <td><strong>${item.name}</strong></td>
+            <td><strong>${escapeHtml(entry.item.name)}</strong></td>
             <td class="actions-cell">
-              <button class="btn-edit" onclick="editCustomer(${item.rowIndex}, '${escapedName}')">Edit</button>
-              <button class="btn-delete" onclick="deleteCustomerRow(${item.rowIndex}, '${escapedName}')">Delete</button>
+              <button class="btn-edit" data-action="edit" data-idx="${entry.idx}">Edit</button>
+              <button class="btn-delete" data-action="delete" data-idx="${entry.idx}">Delete</button>
             </td>
           </tr>
         `;
@@ -369,6 +371,7 @@
 
       const data = {
         rowIndex: rowIndex ? parseInt(rowIndex) : null,
+        originalName: document.getElementById("originalName").value,
         name: name
       };
 
@@ -379,15 +382,16 @@
         })
         .withFailureHandler(function(err) {
           alert("Error saving customer: " + err.message);
-          saveBtn.disabled = false;
-          saveBtn.innerText = "Save Customer";
+          resetForm();
+          loadCustomers();
         })
         .saveCustomer(data);
     }
 
-    function editCustomer(rowIndex, name) {
-      document.getElementById("rowIndex").value = rowIndex;
-      document.getElementById("customerName").value = name;
+    function editCustomer(item) {
+      document.getElementById("rowIndex").value = item.rowIndex;
+      document.getElementById("originalName").value = item.name;
+      document.getElementById("customerName").value = item.name;
 
       document.getElementById("form-header").innerText = "Edit Customer";
       document.getElementById("saveBtn").innerText = "Update Customer";
@@ -398,6 +402,7 @@
 
     function resetForm() {
       document.getElementById("rowIndex").value = "";
+      document.getElementById("originalName").value = "";
       document.getElementById("customerName").value = "";
 
       document.getElementById("form-header").innerText = "Add New Customer";
@@ -406,16 +411,17 @@
       document.getElementById("cancelBtn").style.display = "none";
     }
 
-    function deleteCustomerRow(rowIndex, customerName) {
-      if (confirm(`Are you sure you want to delete "${customerName}"?`)) {
+    function deleteCustomerRow(item) {
+      if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
         google.script.run
           .withSuccessHandler(function() {
             loadCustomers();
           })
           .withFailureHandler(function(err) {
             alert("Error deleting customer: " + err.message);
+            loadCustomers();
           })
-          .deleteCustomer(rowIndex);
+          .deleteCustomer(item.rowIndex, item.name);
       }
     }
   </script>

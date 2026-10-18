@@ -1,31 +1,211 @@
 /**
- * Main entry point: Serves the homepage (Index.html)
+ * Screens the app can serve, by ?page= name. adminOnly pages are hidden
+ * from (and refused to) everyone but the admin.
  */
-function doGet() {
-  const output = HtmlService.createHtmlOutputFromFile('Index');
-  output.setTitle('Park Cleaners Invoice Manager');
-  output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  return output;
+const PAGES = {
+  Index: {},
+  CreateInvoice: {},
+  ViewPastInvoice: {},
+  ServicesManager: {},
+  CustomersManager: {},
+  UserAdmin: { adminOnly: true }
+};
+
+// History sheet columns (1-based)
+const HISTORY_HEADERS = ["Invoice #", "Date", "Customer", "Items", "Total", "PDF Link", "Sent On", "Paid On"];
+const HISTORY_COL = { invoiceNum: 1, pdfUrl: 6, sent: 7, paid: 8 };
+
+/**
+ * Escapes HTML special characters so untrusted strings can't break out of
+ * markup when interpolated into generated HTML (invoice PDFs, etc.).
+ */
+function escapeHtml_(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* =========================================================================
+   ACCESS CONTROL
+   The web app runs as the person using it (executeAs USER_ACCESSING), so
+   Google enforces sharing on the spreadsheet and Invoices folder, and we
+   can see who they are. On top of that, only the admin (the spreadsheet
+   owner) and emails on the "Users" sheet may use the app.
+   ========================================================================= */
+
+function currentUserEmail_() {
+  return (Session.getActiveUser().getEmail() || '').trim().toLowerCase();
 }
 
 /**
- * Page Navigation Helper
+ * The admin is the spreadsheet owner, unless overridden by the ADMIN_EMAIL
+ * script property. Cached in script properties after the first lookup.
  */
-function loadPage(pageName) {
-  return HtmlService.createHtmlOutputFromFile(pageName).getContent();
+function getAdminEmail_() {
+  const props = PropertiesService.getScriptProperties();
+  let admin = props.getProperty('ADMIN_EMAIL');
+  if (!admin) {
+    const owner = SpreadsheetApp.getActiveSpreadsheet().getOwner();
+    admin = owner ? owner.getEmail() : '';
+    if (admin) props.setProperty('ADMIN_EMAIL', admin.toLowerCase());
+  }
+  return (admin || '').trim().toLowerCase();
 }
+
+function isAdmin_(email) {
+  return !!email && email === getAdminEmail_();
+}
+
+function getUsersSheet_(createIfMissing) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Users");
+  if (!sheet && createIfMissing) {
+    sheet = ss.insertSheet("Users");
+    sheet.appendRow(["Email", "Added On", "Added By"]);
+    // Only the owner may edit this sheet, so a staff member with edit access
+    // to the spreadsheet can't add people to the allowlist themselves.
+    const protection = sheet.protect().setDescription("App users - admin only");
+    protection.removeEditors(protection.getEditors());
+    if (protection.canDomainEdit()) protection.setDomainEdit(false);
+  }
+  return sheet;
+}
+
+function getAllowedEmails_() {
+  const sheet = getUsersSheet_(false);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
+    .map(r => String(r[0]).trim().toLowerCase())
+    .filter(String);
+}
+
+function isAllowedUser_(email) {
+  if (!email) return false;
+  return isAdmin_(email) || getAllowedEmails_().indexOf(email) !== -1;
+}
+
+/** Call at the top of every server function the browser can reach. */
+function requireUser_() {
+  const email = currentUserEmail_();
+  if (!isAllowedUser_(email)) {
+    throw new Error("Access denied. Ask the admin to add " + (email || "your Google account") + ".");
+  }
+  return email;
+}
+
+function requireAdmin_() {
+  const email = currentUserEmail_();
+  if (!isAdmin_(email)) throw new Error("Only the admin can do this.");
+  return email;
+}
+
+/* =========================================================================
+   PAGE SERVING
+   Each screen is a real page load (?page=Name) rather than HTML swapped in
+   with document.write(). document.write() keeps the previous screen's
+   JavaScript globals alive, so revisiting a screen re-declared its `let`
+   variables, threw a SyntaxError, and the screen never loaded its data
+   until a full refresh.
+   ========================================================================= */
+
+function doGet(e) {
+  let email = '';
+  try {
+    email = currentUserEmail_();
+    if (!isAllowedUser_(email)) return accessDeniedPage_(email);
+
+    const admin = isAdmin_(email);
+    let pageName = (e && e.parameter && e.parameter.page) || 'Index';
+    if (!PAGES.hasOwnProperty(pageName) || (PAGES[pageName].adminOnly && !admin)) {
+      pageName = 'Index';
+    }
+
+    // First admin visit: remember which Drive folder holds the invoices, so
+    // staff (whose "Invoices" search would find their own folders) use it too.
+    if (admin) getInvoiceFolder_();
+
+    const template = HtmlService.createTemplateFromFile(pageName);
+    template.baseUrl = ScriptApp.getService().getUrl();
+    template.isAdmin = admin;
+    template.userEmail = email;
+
+    const output = template.evaluate();
+    output.setTitle('Park Cleaners Invoice Manager');
+    output.addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    return output;
+  } catch (err) {
+    // Typically: the spreadsheet isn't shared with this account at all.
+    console.error("doGet failed for " + email + ": " + (err && err.stack || err));
+    return accessDeniedPage_(email);
+  }
+}
+
+function accessDeniedPage_(email) {
+  const who = email ? escapeHtml_(email) : "your Google account";
+  return HtmlService.createHtmlOutput(
+    '<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 80px auto; text-align: center;">' +
+    '<h2 style="color: #c62828;">No access</h2>' +
+    '<p style="font-size: 18px;">' + who + ' is not allowed to use the Park Cleaners Invoice Manager.</p>' +
+    '<p style="font-size: 16px; color: #555;">Ask the admin to add you, then reload this page.</p>' +
+    '</div>'
+  ).setTitle('Park Cleaners Invoice Manager');
+}
+
+/** Used by page templates: <?!= include_('Common', { baseUrl: baseUrl }) ?> */
+function include_(name, vars) {
+  const template = HtmlService.createTemplateFromFile(name);
+  Object.keys(vars || {}).forEach(k => template[k] = vars[k]);
+  return template.evaluate().getContent();
+}
+
+/* =========================================================================
+   DRIVE FOLDERS
+   ========================================================================= */
+
+function getInvoiceFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('INVOICE_FOLDER_ID');
+  if (id) return DriveApp.getFolderById(id);
+
+  if (!isAdmin_(currentUserEmail_())) {
+    throw new Error("The Invoices folder isn't set up yet. Ask the admin to open the app once.");
+  }
+  const folders = DriveApp.getFoldersByName("Invoices");
+  const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder("Invoices");
+  props.setProperty('INVOICE_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function getBulkPrintFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('BULK_PRINT_FOLDER_ID');
+  if (id) return DriveApp.getFolderById(id);
+
+  const folder = getInvoiceFolder_().createFolder("Bulk Print");
+  props.setProperty('BULK_PRINT_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+/* =========================================================================
+   CUSTOMERS & SERVICES (read)
+   ========================================================================= */
 
 /**
  * Fetch customer list from the 'Customers' sheet.
  */
 function getCustomerList() {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Customers");
   if (!sheet) return [];
-  
+
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
-  
+
   return data.slice(1).map(row => row[0]).filter(String);
 }
 
@@ -33,19 +213,121 @@ function getCustomerList() {
  * Fetch service list and prices from the 'Services' sheet.
  */
 function getServiceList() {
+  requireUser_();
+  return readServiceList_();
+}
+
+function readServiceList_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Services");
   if (!sheet) return [];
-  
+
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
-  
+
   return data.slice(1).map(row => {
     return {
-      service: row[0],
+      service: String(row[0]).trim(),
       price: Number(row[1]) || 0
     };
   }).filter(item => item.service);
+}
+
+/* =========================================================================
+   INVOICES
+   ========================================================================= */
+
+function getHistorySheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("History");
+  if (!sheet) {
+    sheet = ss.insertSheet("History");
+    sheet.appendRow(HISTORY_HEADERS);
+  } else if (sheet.getLastColumn() < HISTORY_HEADERS.length) {
+    // Older sheets predate the Sent On / Paid On columns
+    sheet.getRange(1, 1, 1, HISTORY_HEADERS.length).setValues([HISTORY_HEADERS]);
+  }
+  return sheet;
+}
+
+/** Returns the 1-based History row for an invoice number, or 0. */
+function findHistoryRow_(sheet, invoiceNum) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const nums = sheet.getRange(2, HISTORY_COL.invoiceNum, lastRow - 1, 1).getValues();
+  const target = String(invoiceNum).trim();
+  for (let i = 0; i < nums.length; i++) {
+    if (String(nums[i][0]).trim() === target) return i + 2;
+  }
+  return 0;
+}
+
+function round2_(n) {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Re-prices line items from the Services sheet instead of trusting the
+ * prices and totals sent by the browser.
+ */
+function normalizeItems_(rawItems) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    throw new Error("An invoice needs at least one line item.");
+  }
+  const prices = {};
+  readServiceList_().forEach(s => prices[s.service] = s.price);
+
+  return rawItems.map(raw => {
+    const service = String(raw.service || '').trim();
+    if (!prices.hasOwnProperty(service)) {
+      throw new Error(`"${service}" is no longer in the services list. Remove it from the invoice and add it again.`);
+    }
+    const quantity = Number(raw.quantity);
+    if (!isFinite(quantity) || quantity <= 0) {
+      throw new Error(`Invalid quantity for "${service}".`);
+    }
+    const price = prices[service];
+    return {
+      service: service,
+      notes: String(raw.notes || '').trim().slice(0, 500),
+      quantity: quantity,
+      price: price,
+      total: round2_(price * quantity)
+    };
+  });
+}
+
+/**
+ * Splits items into pages by estimated printed height rather than a flat row
+ * count, since long descriptions/notes wrap onto several lines.
+ * Budgets are in "single-line row" units; tune after checking real PDFs.
+ */
+function paginateItems_(items) {
+  const LINES_PER_PAGE = 16;
+  const DESC_CHARS_PER_LINE = 36;
+  const NOTES_CHARS_PER_LINE = 26;
+
+  const cost = item => {
+    const lines = Math.max(
+      1,
+      Math.ceil(item.service.length / DESC_CHARS_PER_LINE),
+      Math.ceil((item.notes || '').length / NOTES_CHARS_PER_LINE)
+    );
+    return 1 + (lines - 1) * 0.55; // extra wrapped lines are shorter than a full row
+  };
+
+  const pages = [[]];
+  let used = 0;
+  items.forEach(item => {
+    const c = cost(item);
+    if (used + c > LINES_PER_PAGE && pages[pages.length - 1].length > 0) {
+      pages.push([]);
+      used = 0;
+    }
+    pages[pages.length - 1].push(item);
+    used += c;
+  });
+  return pages;
 }
 
 /**
@@ -53,50 +335,168 @@ function getServiceList() {
  * and saves it into the "Invoices" Drive folder.
  */
 function finalizeInvoice(invoiceData) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let historySheet = ss.getSheetByName("History");
-  
-  if (!historySheet) {
-    historySheet = ss.insertSheet("History");
-    historySheet.appendRow(["Invoice #", "Date", "Customer", "Items", "Total", "PDF Link"]);
-  }
-  
-  // Calculate Invoice #
-  const lastRow = historySheet.getLastRow();
-  const invoiceNum = lastRow > 1 ? 1000 + (lastRow - 1) : 1080;
-  
+  requireUser_();
+
+  const customer = String(invoiceData.customer || '').trim();
+  if (!customer) throw new Error("Please select a customer.");
+  const items = normalizeItems_(invoiceData.items);
+  const total = round2_(items.reduce((sum, item) => sum + item.total, 0));
+
   // Format dates (MM/DD/YYYY)
   const rawDate = invoiceData.date ? new Date(invoiceData.date + "T00:00:00") : new Date();
-  
-  const serviceDateFormatted = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), "MM/dd/yyyy");
-  const dateIssuedFormatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
+  const tz = Session.getScriptTimeZone();
+  const serviceDateFormatted = Utilities.formatDate(rawDate, tz, "MM/dd/yyyy");
+  const dateIssuedFormatted = Utilities.formatDate(new Date(), tz, "MM/dd/yyyy");
 
-  // 1. Locate or create the "Invoices" folder in Google Drive
-  const folderName = "Invoices";
-  const folders = DriveApp.getFoldersByName(folderName);
-  let invoiceFolder;
-  if (folders.hasNext()) {
-    invoiceFolder = folders.next();
-  } else {
-    invoiceFolder = DriveApp.createFolder(folderName);
+  const invoiceFolder = getInvoiceFolder_();
+  const historySheet = getHistorySheet_();
+
+  const itemsSummary = items.map(item => {
+    const noteText = item.notes ? ` (${item.notes})` : '';
+    return `${item.quantity}x ${item.service}${noteText} [$${item.price.toFixed(2)}]`;
+  }).join("; ");
+
+  // Reserve the invoice number by writing its History row while holding a
+  // lock, so two people finalizing at once can't get the same number. The
+  // number is based on the highest existing one, so a deleted History row
+  // can't cause a number to be reused.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let invoiceNum;
+  try {
+    let maxInvoiceNum = 1079;
+    const lastRow = historySheet.getLastRow();
+    if (lastRow > 1) {
+      historySheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(row => {
+        const n = Number(row[0]);
+        if (n > maxInvoiceNum) maxInvoiceNum = n;
+      });
+    }
+    invoiceNum = maxInvoiceNum + 1;
+    historySheet.appendRow([invoiceNum, dateIssuedFormatted, customer, itemsSummary, total, '', '', '']);
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
   }
 
-  // 2. Build HTML table rows matching exact layout
-  let tableRowsHtml = "";
-  invoiceData.items.forEach(function(item) {
-    tableRowsHtml += `
+  try {
+    const pdfFile = createInvoicePdf_({
+      invoiceNum: invoiceNum,
+      customer: customer,
+      items: items,
+      total: total,
+      serviceDateFormatted: serviceDateFormatted,
+      dateIssuedFormatted: dateIssuedFormatted
+    }, invoiceFolder);
+    const pdfUrl = pdfFile.getUrl();
+    historySheet.getRange(findHistoryRow_(historySheet, invoiceNum), HISTORY_COL.pdfUrl).setValue(pdfUrl);
+
+    return {
+      success: true,
+      invoiceNum: invoiceNum,
+      pdfUrl: pdfUrl
+    };
+  } catch (err) {
+    // No PDF was made, so release the reserved number rather than leave a
+    // History row that points nowhere.
+    const row = findHistoryRow_(historySheet, invoiceNum);
+    if (row) historySheet.deleteRow(row);
+    throw err;
+  }
+}
+
+function createInvoicePdf_(inv, invoiceFolder) {
+  const pages = paginateItems_(inv.items);
+  const totalPages = pages.length;
+
+  const headerHtml = `
+    <div class="company-header">
+      <div class="company-name">Park Cleaners</div>
+      <div class="company-sub">
+        Professional Cleaning &amp; Tailoring Services<br>
+        97 Pehle Ave, Saddle Brook, NJ 07663<br>
+        201-388-1044 &bull; park.cleaners@yahoo.com
+      </div>
+    </div>
+
+    <table class="meta-container">
       <tr>
-        <td style="border: 2px solid #000000; padding: 12px 10px; font-weight: bold;">${serviceDateFormatted}</td>
-        <td style="border: 2px solid #000000; padding: 12px 10px; font-weight: bold;">${item.service}</td>
-        <td style="border: 2px solid #000000; padding: 12px 10px; font-weight: bold;">${item.notes || ''}</td>
-        <td style="border: 2px solid #000000; padding: 12px 10px; font-weight: bold; text-align: left;">${item.quantity}</td>
-        <td style="border: 2px solid #000000; padding: 12px 10px; font-weight: bold;">$${item.price.toFixed(2)}</td>
-        <td style="border: 2px solid #000000; padding: 12px 10px; font-weight: bold;">$${item.total.toFixed(2)}</td>
+        <td style="vertical-align: top;">
+          <div class="bill-to-label">Bill To</div>
+          <div class="bill-to-name">${escapeHtml_(inv.customer)}</div>
+        </td>
+        <td style="vertical-align: top;" class="meta-right">
+          <div>Invoice #: ${inv.invoiceNum}</div>
+          <div style="margin-top: 3px;">Date Issued: ${inv.dateIssuedFormatted}</div>
+        </td>
       </tr>
+    </table>
+
+    <hr class="divider">
+  `;
+
+  const continuationHeaderHtml = `
+    <div class="continuation-header">
+      Park Cleaners &mdash; Invoice #${inv.invoiceNum} for ${escapeHtml_(inv.customer)} (continued)
+    </div>
+  `;
+
+  let pagesHtml = "";
+  pages.forEach(function(pageItems, p) {
+    const isLastPage = p === totalPages - 1;
+
+    let rowsHtml = "";
+    pageItems.forEach(function(item) {
+      rowsHtml += `
+        <tr>
+          <td style="border: 1px solid #000000; padding: 5px 8px; font-weight: bold;">${inv.serviceDateFormatted}</td>
+          <td style="border: 1px solid #000000; padding: 5px 8px; font-weight: bold;">${escapeHtml_(item.service)}</td>
+          <td style="border: 1px solid #000000; padding: 5px 8px; font-weight: bold;">${escapeHtml_(item.notes || '')}</td>
+          <td style="border: 1px solid #000000; padding: 5px 8px; font-weight: bold; text-align: left;">${item.quantity}</td>
+          <td style="border: 1px solid #000000; padding: 5px 8px; font-weight: bold;">$${item.price.toFixed(2)}</td>
+          <td style="border: 1px solid #000000; padding: 5px 8px; font-weight: bold;">$${item.total.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+
+    pagesHtml += `
+      <div class="invoice-page${isLastPage ? '' : ' page-break'}">
+        ${p === 0 ? headerHtml : continuationHeaderHtml}
+
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th style="width: 17%;">SERVICE DATE</th>
+              <th style="width: 31%;">DESCRIPTION</th>
+              <th style="width: 22%;">NOTES</th>
+              <th style="width: 10%;">QTY</th>
+              <th style="width: 10%;">PRICE</th>
+              <th style="width: 10%;">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        ${isLastPage ? `
+          <div class="total-container">
+            TOTAL: $${inv.total.toFixed(2)}
+          </div>
+          <div class="footer-container">
+            Thank you for your business!<br>
+            Barry Barone
+          </div>
+        ` : ''}
+
+        <div class="page-footer">
+          Invoice #${inv.invoiceNum} &bull; Date Issued: ${inv.dateIssuedFormatted} &bull; Page ${p + 1} of ${totalPages}
+        </div>
+      </div>
     `;
   });
 
-  // 3. Build full printable HTML layout
+  // Build full printable HTML layout
   const fullPdfHtml = `
     <!DOCTYPE html>
     <html>
@@ -108,207 +508,165 @@ function finalizeInvoice(invoiceData) {
         }
         body {
           font-family: Arial, Helvetica, sans-serif;
-          margin: 30px;
+          margin: 0;
           color: #000000;
           background: #ffffff;
         }
-        
+
+        /* Each .invoice-page holds one physical page's worth of rows;
+           page-break forces a new page before the next .invoice-page. */
+        .page-break {
+          page-break-after: always;
+        }
+        .invoice-table tr {
+          page-break-inside: avoid;
+        }
+
         /* HEADER SECTION */
         .company-header {
           text-align: center;
-          margin-bottom: 40px;
+          margin-bottom: 18px;
         }
         .company-name {
-          font-size: 38px;
+          font-size: 24px;
           font-weight: 800;
           letter-spacing: -0.5px;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
         .company-sub {
-          font-size: 16px;
+          font-size: 11px;
           font-weight: bold;
-          line-height: 1.4;
+          line-height: 1.3;
+        }
+
+        /* CONTINUATION HEADER (page 2+) */
+        .continuation-header {
+          font-size: 11px;
+          font-weight: bold;
+          color: #555555;
+          margin-bottom: 10px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid #cccccc;
         }
 
         /* METADATA SECTION */
         .meta-container {
           width: 100%;
-          margin-bottom: 20px;
+          margin-bottom: 12px;
         }
         .bill-to-label {
-          font-size: 18px;
+          font-size: 12px;
           font-weight: bold;
         }
         .bill-to-name {
-          font-size: 20px;
+          font-size: 14px;
           font-weight: bold;
-          margin-top: 4px;
+          margin-top: 3px;
         }
         .meta-right {
           text-align: right;
-          font-size: 20px;
+          font-size: 14px;
           font-weight: bold;
         }
 
         .divider {
           border: none;
-          border-top: 2px solid #777777;
-          margin-top: 15px;
-          margin-bottom: 25px;
+          border-top: 1px solid #777777;
+          margin-top: 8px;
+          margin-bottom: 14px;
         }
 
         /* INVOICE TABLE */
         .invoice-table {
           width: 100%;
           border-collapse: collapse;
-          border: 2px solid #000000;
+          border: 1px solid #000000;
         }
         .invoice-table th {
           background-color: #f2f2f2;
-          border: 2px solid #000000;
-          padding: 12px 10px;
+          border: 1px solid #000000;
+          padding: 6px 8px;
           text-align: left;
-          font-size: 16px;
+          font-size: 11px;
           font-weight: 800;
           text-transform: uppercase;
         }
         .invoice-table td {
-          font-size: 15px;
+          font-size: 10.5px;
         }
 
         /* TOTAL SECTION */
         .total-container {
           text-align: right;
-          margin-top: 35px;
-          font-size: 28px;
+          margin-top: 18px;
+          font-size: 18px;
           font-weight: 800;
           letter-spacing: 0.5px;
         }
 
-        /* FOOTER SECTION */
+        /* THANK-YOU FOOTER (last page only) */
         .footer-container {
           text-align: center;
-          margin-top: 60px;
-          font-size: 20px;
+          margin-top: 24px;
+          font-size: 13px;
           font-weight: bold;
-          line-height: 1.4;
+          line-height: 1.3;
+        }
+
+        /* PAGE FOOTER (invoice #, date, page count). Kept in normal flow
+           below each page's content: a position:fixed footer per page would
+           repeat on every printed page and stack on top of the others. */
+        .page-footer {
+          margin-top: 18px;
+          text-align: center;
+          font-size: 9px;
+          font-weight: bold;
+          color: #555555;
+          border-top: 1px solid #cccccc;
+          padding-top: 4px;
         }
       </style>
     </head>
     <body>
-
-      <!-- HEADER -->
-      <div class="company-header">
-        <div class="company-name">Park Cleaners</div>
-        <div class="company-sub">
-          Professional Cleaning & Tailoring Services<br>
-          97 Pehle Ave, Saddle Brook, NJ 07663<br>
-          201-388-1044 &bull; park.cleaners@yahoo.com
-        </div>
-      </div>
-
-      <!-- BILL TO & INVOICE DETAILS -->
-      <table class="meta-container">
-        <tr>
-          <td style="vertical-align: top;">
-            <div class="bill-to-label">Bill To</div>
-            <div class="bill-to-name">${invoiceData.customer}</div>
-          </td>
-          <td style="vertical-align: top;" class="meta-right">
-            <div>Invoice #: ${invoiceNum}</div>
-            <div style="margin-top: 4px;">Date Issued: ${dateIssuedFormatted}</div>
-          </td>
-        </tr>
-      </table>
-
-      <hr class="divider">
-
-      <!-- ITEMS TABLE -->
-      <table class="invoice-table">
-        <thead>
-          <tr>
-            <th style="width: 17%;">SERVICE DATE</th>
-            <th style="width: 31%;">DESCRIPTION</th>
-            <th style="width: 22%;">NOTES</th>
-            <th style="width: 10%;">QTY</th>
-            <th style="width: 10%;">PRICE</th>
-            <th style="width: 10%;">TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRowsHtml}
-        </tbody>
-      </table>
-
-      <!-- GRAND TOTAL -->
-      <div class="total-container">
-        TOTAL: $${invoiceData.total.toFixed(2)}
-      </div>
-
-      <!-- FOOTER -->
-      <div class="footer-container">
-        Thank you for your business!<br>
-        Barry Barone
-      </div>
-
+      ${pagesHtml}
     </body>
     </html>
   `;
 
-  // 4. Create real PDF file inside Drive folder
-  const blob = Utilities.newBlob(fullPdfHtml, 'text/html', `Invoice_${invoiceNum}_${invoiceData.customer}.html`);
+  const blob = Utilities.newBlob(fullPdfHtml, 'text/html', `Invoice_${inv.invoiceNum}_${inv.customer}.html`);
   const pdfFile = invoiceFolder.createFile(blob.getAs('application/pdf'));
-  
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  const pdfUrl = pdfFile.getUrl();
-
-  // 5. Append record to History sheet
-  const itemsSummary = invoiceData.items.map(item => {
-    const noteText = item.notes ? ` (${item.notes})` : '';
-    return `${item.quantity}x ${item.service}${noteText} [$${item.price.toFixed(2)}]`;
-  }).join("; ");
-
-  historySheet.appendRow([
-    invoiceNum,
-    dateIssuedFormatted,
-    invoiceData.customer,
-    itemsSummary,
-    invoiceData.total,
-    pdfUrl
-  ]);
-
-  return {
-    success: true,
-    invoiceNum: invoiceNum,
-    pdfUrl: pdfUrl
-  };
+  return pdfFile;
 }
 
 /**
  * Fetches all invoice history records and unique customer list for searching/sorting.
  */
 function getInvoiceHistory() {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const historySheet = ss.getSheetByName("History");
   const customerSheet = ss.getSheetByName("Customers");
-  
-  if (!historySheet) return { invoices: [], customers: [] };
-  
-  // Use getDisplayValues() instead of getValues() to read exact formatted cell text
-  const data = historySheet.getDataRange().getDisplayValues();
+
   let invoices = [];
-  
-  if (data.length > 1) {
-    invoices = data.slice(1).map(row => {
+  if (historySheet && historySheet.getLastRow() > 1) {
+    // Use getDisplayValues() instead of getValues() to read exact formatted cell text
+    const data = historySheet
+      .getRange(2, 1, historySheet.getLastRow() - 1, HISTORY_HEADERS.length)
+      .getDisplayValues();
+    invoices = data.map(row => {
       return {
-        invoiceNum: row[0] ? row[0].toString() : '',
-        date: row[1] ? row[1].toString() : '',
-        customer: row[2] ? row[2].toString() : '',
-        items: row[3] ? row[3].toString() : '',
-        total: row[4] ? row[4].toString() : '',
-        pdfUrl: row[5] ? row[5].toString() : ''
+        invoiceNum: row[0],
+        date: row[1],
+        customer: row[2],
+        items: row[3],
+        // Strip any currency formatting so the page can add its own "$"
+        total: row[4].replace(/[^0-9.-]/g, ''),
+        pdfUrl: row[5],
+        sent: row[6],
+        paid: row[7]
       };
-    });
+    }).filter(inv => inv.invoiceNum);
   }
 
   let customers = [];
@@ -326,9 +684,97 @@ function getInvoiceHistory() {
 }
 
 /**
+ * Marks an invoice as sent or paid (done = true), or clears the mark.
+ * Returns the stored date text ('' when cleared).
+ */
+function setInvoiceStatus(invoiceNum, field, done) {
+  requireUser_();
+  const col = HISTORY_COL[field];
+  if (field !== 'sent' && field !== 'paid') throw new Error("Unknown status: " + field);
+
+  const sheet = getHistorySheet_();
+  const row = findHistoryRow_(sheet, invoiceNum);
+  if (!row) throw new Error("Invoice #" + invoiceNum + " was not found.");
+
+  const cell = sheet.getRange(row, col);
+  cell.setValue(done ? Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy") : '');
+  SpreadsheetApp.flush();
+  return cell.getDisplayValue();
+}
+
+function driveIdFromUrl_(url) {
+  const m = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url).match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+
+/**
+ * Returns the PDFs for up to 10 invoices as base64, for merging into one
+ * printable file in the browser. Looked up by invoice number so the page
+ * can't ask for arbitrary Drive files.
+ */
+function getInvoicePdfs(invoiceNums) {
+  requireUser_();
+  if (!Array.isArray(invoiceNums) || invoiceNums.length > 10) {
+    throw new Error("Request at most 10 invoices at a time.");
+  }
+  const sheet = getHistorySheet_();
+  return invoiceNums.map(num => {
+    const row = findHistoryRow_(sheet, num);
+    const fileId = row ? driveIdFromUrl_(sheet.getRange(row, HISTORY_COL.pdfUrl).getValue()) : '';
+    if (!fileId) throw new Error("Invoice #" + num + " has no PDF.");
+    const bytes = DriveApp.getFileById(fileId).getBlob().getBytes();
+    return { invoiceNum: String(num), data: Utilities.base64Encode(bytes) };
+  });
+}
+
+/**
+ * Saves a merged bulk-print PDF to Invoices/Bulk Print and returns its link.
+ * Bulk files older than a day are cleaned up as new ones are made.
+ */
+function saveBulkPrintPdf(base64Pdf, invoiceCount) {
+  requireUser_();
+  const folder = getBulkPrintFolder_();
+
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const old = folder.getFiles();
+  while (old.hasNext()) {
+    const f = old.next();
+    if (f.getDateCreated().getTime() < cutoff) {
+      try { f.setTrashed(true); } catch (e) { /* made by someone else; leave it */ }
+    }
+  }
+
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HHmm");
+  const blob = Utilities.newBlob(
+    Utilities.base64Decode(base64Pdf),
+    'application/pdf',
+    `Bulk_Print_${Number(invoiceCount) || 0}_invoices_${stamp}.pdf`
+  );
+  return folder.createFile(blob).getUrl();
+}
+
+/* =========================================================================
+   SERVICES MANAGER
+   ========================================================================= */
+
+/**
+ * Throws unless rowIndex still holds expectedName, so an edit or delete made
+ * from a stale page can't hit the wrong row after the sheet has changed.
+ */
+function assertRowMatches_(sheet, rowIndex, expectedName, listName) {
+  const row = Number(rowIndex);
+  const ok = Number.isInteger(row) && row >= 2 && row <= sheet.getLastRow() &&
+    sheet.getRange(row, 1).getDisplayValue().trim() === String(expectedName || '').trim();
+  if (!ok) {
+    throw new Error(`The ${listName} list changed since this page loaded. It has been reloaded - please try again.`);
+  }
+}
+
+/**
  * Fetch all services from the 'Services' sheet for the Services Manager page.
  */
 function getServicesData() {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Services");
   if (!sheet) return [];
@@ -354,6 +800,7 @@ function getServicesData() {
  * Save a new service or update an existing one in the 'Services' sheet.
  */
 function saveService(data) {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("Services");
 
@@ -362,12 +809,14 @@ function saveService(data) {
     sheet.appendRow(["Service", "Price"]);
   }
 
-  const serviceName = data.service.trim();
+  const serviceName = String(data.service || '').trim();
+  if (!serviceName) throw new Error("Service name is required.");
   const priceVal = parseFloat(data.price) || 0;
   const formattedPrice = priceVal.toFixed(2);
 
   if (data.rowIndex) {
     // Update existing row
+    assertRowMatches_(sheet, data.rowIndex, data.originalService, "services");
     sheet.getRange(data.rowIndex, 1, 1, 2).setValues([[serviceName, formattedPrice]]);
   } else {
     // Add new row
@@ -380,19 +829,26 @@ function saveService(data) {
 /**
  * Delete a service row from the 'Services' sheet.
  */
-function deleteService(rowIndex) {
+function deleteService(rowIndex, expectedService) {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Services");
   if (sheet && rowIndex) {
+    assertRowMatches_(sheet, rowIndex, expectedService, "services");
     sheet.deleteRow(rowIndex);
   }
   return { success: true };
 }
 
+/* =========================================================================
+   CUSTOMERS MANAGER
+   ========================================================================= */
+
 /**
  * Fetch all customers from the 'Customers' sheet for the Customers Manager page.
  */
 function getCustomersData() {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Customers");
   if (!sheet) return [];
@@ -417,6 +873,7 @@ function getCustomersData() {
  * Save a new customer or update an existing one in the 'Customers' sheet.
  */
 function saveCustomer(data) {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("Customers");
 
@@ -425,10 +882,12 @@ function saveCustomer(data) {
     sheet.appendRow(["Customer Name"]);
   }
 
-  const customerName = data.name.trim();
+  const customerName = String(data.name || '').trim();
+  if (!customerName) throw new Error("Customer name is required.");
 
   if (data.rowIndex) {
     // Update existing row
+    assertRowMatches_(sheet, data.rowIndex, data.originalName, "customers");
     sheet.getRange(data.rowIndex, 1, 1, 1).setValue(customerName);
   } else {
     // Add new row
@@ -441,11 +900,71 @@ function saveCustomer(data) {
 /**
  * Delete a customer row from the 'Customers' sheet.
  */
-function deleteCustomer(rowIndex) {
+function deleteCustomer(rowIndex, expectedName) {
+  requireUser_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Customers");
   if (sheet && rowIndex) {
+    assertRowMatches_(sheet, rowIndex, expectedName, "customers");
     sheet.deleteRow(rowIndex);
   }
   return { success: true };
+}
+
+/* =========================================================================
+   USER ADMIN (admin only)
+   Adding a user shares the spreadsheet and Invoices folder with them (they
+   need both, since the app runs as them) and puts them on the allowlist.
+   ========================================================================= */
+
+function getUsers() {
+  requireAdmin_();
+  const sheet = getUsersSheet_(false);
+  let users = [];
+  if (sheet && sheet.getLastRow() > 1) {
+    users = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues()
+      .map(r => ({ email: r[0].trim().toLowerCase(), addedOn: r[1] }))
+      .filter(u => u.email);
+  }
+  return {
+    adminEmail: getAdminEmail_(),
+    appUrl: ScriptApp.getService().getUrl(),
+    users: users
+  };
+}
+
+function addUser(rawEmail) {
+  const adminEmail = requireAdmin_();
+  const email = String(rawEmail || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("That doesn't look like an email address.");
+  if (email === adminEmail) throw new Error("You're the admin - you always have access.");
+  if (getAllowedEmails_().indexOf(email) !== -1) throw new Error(email + " already has access.");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const folder = getInvoiceFolder_();
+  ss.addEditor(email);
+  folder.addEditor(email);
+  // Stop staff from re-sharing the data with people the admin didn't add
+  DriveApp.getFileById(ss.getId()).setShareableByEditors(false);
+  folder.setShareableByEditors(false);
+
+  const tz = Session.getScriptTimeZone();
+  getUsersSheet_(true).appendRow([email, Utilities.formatDate(new Date(), tz, "MM/dd/yyyy"), adminEmail]);
+  return getUsers();
+}
+
+function removeUser(rawEmail) {
+  requireAdmin_();
+  const email = String(rawEmail || '').trim().toLowerCase();
+  const sheet = getUsersSheet_(false);
+  if (sheet && sheet.getLastRow() > 1) {
+    const emails = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+    // Bottom-up so deleting a row doesn't shift ones not yet checked
+    for (let i = emails.length - 1; i >= 0; i--) {
+      if (String(emails[i][0]).trim().toLowerCase() === email) sheet.deleteRow(i + 2);
+    }
+  }
+  try { SpreadsheetApp.getActiveSpreadsheet().removeEditor(email); } catch (e) { /* not an editor */ }
+  try { getInvoiceFolder_().removeEditor(email); } catch (e) { /* not an editor */ }
+  return getUsers();
 }
