@@ -131,8 +131,12 @@ function doGet(e) {
     // staff (whose "Invoices" search would find their own folders) use it too.
     if (admin) getInvoiceFolder_();
 
+    const baseUrl = ScriptApp.getService().getUrl();
+    const common = HtmlService.createTemplateFromFile('Common');
+    common.baseUrl = baseUrl;
+
     const template = HtmlService.createTemplateFromFile(pageName);
-    template.baseUrl = ScriptApp.getService().getUrl();
+    template.commonHtml = common.evaluate().getContent();
     template.isAdmin = admin;
     template.userEmail = email;
 
@@ -144,7 +148,10 @@ function doGet(e) {
   } catch (err) {
     // Typically: the spreadsheet isn't shared with this account at all.
     console.error("doGet failed for " + email + ": " + (err && err.stack || err));
-    return accessDeniedPage_(email, "Error: " + (err && err.message || err));
+    // Show the admin where it failed; everyone else just gets the message
+    let showStack = false;
+    try { showStack = !!email && email === PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL'); } catch (e) {}
+    return accessDeniedPage_(email, "Error: " + (err && (showStack ? err.stack : err.message) || err));
   }
 }
 
@@ -158,13 +165,6 @@ function accessDeniedPage_(email, details) {
     (details ? '<p style="font-size: 13px; color: #888;">' + escapeHtml_(details) + '</p>' : '') +
     '</div>'
   ).setTitle('Park Cleaners Invoice Manager');
-}
-
-/** Used by page templates: <?!= include_('Common', { baseUrl: baseUrl }) ?> */
-function include_(name, vars) {
-  const template = HtmlService.createTemplateFromFile(name);
-  Object.keys(vars || {}).forEach(k => template[k] = vars[k]);
-  return template.evaluate().getContent();
 }
 
 /* =========================================================================
