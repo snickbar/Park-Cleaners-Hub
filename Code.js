@@ -137,6 +137,7 @@ function doGet(e) {
 
     const template = HtmlService.createTemplateFromFile(pageName);
     template.commonHtml = common.evaluate().getContent();
+    template.baseUrl = baseUrl;
     template.isAdmin = admin;
     template.userEmail = email;
 

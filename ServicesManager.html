@@ -35,6 +35,9 @@
     }
 
     .btn-home {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
       background-color: #e0e0e0;
       color: #000000;
       border: 1px solid #9e9e9e;
@@ -209,7 +212,7 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-title">Park Cleaners - Service Manager</div>
-    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
   </div>
 
   <!-- MAIN CONTAINER -->

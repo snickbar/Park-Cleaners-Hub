@@ -38,6 +38,9 @@
     }
 
     .btn-home {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
       background: #e0e0e0;
       color: #111;
       border: 2px solid #888;
@@ -252,6 +255,10 @@
     }
 
     .btn-modal {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
       flex: 1;
       height: 54px;
       font-size: 22px;
@@ -271,7 +278,7 @@
   <!-- HEADER BAR -->
   <div class="header-bar">
     <div class="header-title">Park Cleaners - Create Invoice</div>
-    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
   </div>
 
   <!-- SPLIT SCREEN LAYOUT -->
@@ -384,8 +391,8 @@
       <div class="modal-title">Invoice Created Successfully!</div>
       <p style="font-size: 20px;">Would you like to print / view it now?</p>
       <div class="modal-actions">
-        <button class="btn-modal btn-yes" onclick="openPdf()">Yes</button>
-        <button class="btn-modal btn-no" onclick="goHome()">No</button>
+        <a class="btn-modal btn-yes" id="btnOpenPdf" href="#" target="_blank" onclick="afterOpenPdf()">Yes</a>
+        <a class="btn-modal btn-no" href="<?= baseUrl ?>" target="_top">No</a>
       </div>
     </div>
   </div>
@@ -611,6 +618,7 @@
 
       if (response.success) {
         currentPdfUrl = response.pdfUrl;
+        document.getElementById("btnOpenPdf").href = currentPdfUrl;
         document.getElementById("successModal").style.display = "flex";
       }
     }
@@ -623,11 +631,9 @@
       alert("Error generating invoice PDF: " + err.message);
     }
 
-    function openPdf() {
-      if (currentPdfUrl) {
-        window.open(currentPdfUrl, "_blank");
-      }
-      goHome();
+    // The Yes link opens the PDF in a new tab by itself; then head home.
+    function afterOpenPdf() {
+      setTimeout(goHome, 300);
     }
   </script>
 </body>

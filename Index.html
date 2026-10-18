@@ -32,6 +32,7 @@
 
     /* ADMIN BUTTON (top right, admin only) */
     .btn-admin {
+      text-decoration: none;
       position: absolute;
       top: 50%;
       right: 20px;
@@ -76,6 +77,7 @@
        CARDS / BUTTON SECTIONS
     ========================= */
     .card {
+      text-decoration: none;
       border-radius: 16px;
       padding: 36px 20px;
       text-align: center;
@@ -167,7 +169,7 @@
       Park Cleaners Invoice Manager
     </div>
     <? if (isAdmin) { ?>
-      <button class="btn-admin" onclick="goTo('UserAdmin')">👤 Users</button>
+      <a class="btn-admin" href="<?= baseUrl ?>?page=UserAdmin" target="_top">👤 Users</a>
     <? } ?>
   </div>
 
@@ -176,38 +178,32 @@
     <div class="grid">
 
       <!-- SECTION 1: CREATE NEW INVOICE -->
-      <div class="card card-create" onclick="navigateTo('CreateInvoice')">
+      <a class="card card-create" href="<?= baseUrl ?>?page=CreateInvoice" target="_top">
         <div class="card-icon">➕</div>
         <div class="card-title">Create New Invoice</div>
-      </div>
+      </a>
 
       <!-- SECTION 2: VIEW PAST INVOICE -->
-      <div class="card card-view" onclick="navigateTo('ViewPastInvoice')">
+      <a class="card card-view" href="<?= baseUrl ?>?page=ViewPastInvoice" target="_top">
         <div class="card-icon">📄</div>
         <div class="card-title">View Past Invoice</div>
-      </div>
+      </a>
 
       <!-- SECTION 3: SERVICE AND PRICING MANAGER -->
-      <div class="card card-service" onclick="navigateTo('ServicesManager')">
+      <a class="card card-service" href="<?= baseUrl ?>?page=ServicesManager" target="_top">
         <div class="card-icon">🏷️</div>
         <div class="card-title">Service and Pricing Manager</div>
-      </div>
+      </a>
 
       <!-- SECTION 4: CUSTOMER MANAGER -->
-      <div class="card card-customer" onclick="navigateTo('CustomersManager')">
+      <a class="card card-customer" href="<?= baseUrl ?>?page=CustomersManager" target="_top">
         <div class="card-icon">👥</div>
         <div class="card-title">Customer Manager</div>
-      </div>
+      </a>
 
     </div>
   </div>
 
-  <?!= commonHtml ?>
-  <script>
-    function navigateTo(pageName) {
-      goTo(pageName);
-    }
-  </script>
 
 </body>
 

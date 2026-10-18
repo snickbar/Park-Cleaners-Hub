@@ -40,6 +40,9 @@
     }
 
     .btn-home {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
       background: #e0e0e0;
       color: #111;
       border: 2px solid #888;
@@ -322,7 +325,7 @@
   <!-- HEADER BAR -->
   <div class="header-bar">
     <div class="header-title">Park Cleaners - View Past Invoices</div>
-    <button class="btn-home" onclick="goHome()">🏠 Home</button>
+    <a class="btn-home" href="<?= baseUrl ?>" target="_top">🏠 Home</a>
   </div>
 
   <div class="main-container">
