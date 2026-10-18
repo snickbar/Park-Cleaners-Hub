@@ -115,6 +115,10 @@ function doGet(e) {
   let email = '';
   try {
     email = currentUserEmail_();
+    if (!getAdminEmail_()) {
+      return accessDeniedPage_(email, "No admin is set up yet. In the Apps Script editor, open Project Settings > " +
+        "Script Properties and add ADMIN_EMAIL with the admin's Google account email.");
+    }
     if (!isAllowedUser_(email)) return accessDeniedPage_(email);
 
     const admin = isAdmin_(email);
@@ -140,17 +144,18 @@ function doGet(e) {
   } catch (err) {
     // Typically: the spreadsheet isn't shared with this account at all.
     console.error("doGet failed for " + email + ": " + (err && err.stack || err));
-    return accessDeniedPage_(email);
+    return accessDeniedPage_(email, "Error: " + (err && err.message || err));
   }
 }
 
-function accessDeniedPage_(email) {
+function accessDeniedPage_(email, details) {
   const who = email ? escapeHtml_(email) : "your Google account";
   return HtmlService.createHtmlOutput(
     '<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 80px auto; text-align: center;">' +
     '<h2 style="color: #c62828;">No access</h2>' +
     '<p style="font-size: 18px;">' + who + ' is not allowed to use the Park Cleaners Invoice Manager.</p>' +
     '<p style="font-size: 16px; color: #555;">Ask the admin to add you, then reload this page.</p>' +
+    (details ? '<p style="font-size: 13px; color: #888;">' + escapeHtml_(details) + '</p>' : '') +
     '</div>'
   ).setTitle('Park Cleaners Invoice Manager');
 }
