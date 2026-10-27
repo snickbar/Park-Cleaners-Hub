@@ -398,8 +398,9 @@ function finalizeInvoice(invoiceData) {
     lock.releaseLock();
   }
 
+  let pdfFile = null;
   try {
-    const pdfFile = createInvoicePdf_({
+    pdfFile = createInvoicePdf_({
       invoiceNum: invoiceNum,
       customer: customer,
       items: items,
@@ -416,10 +417,14 @@ function finalizeInvoice(invoiceData) {
       pdfUrl: pdfUrl
     };
   } catch (err) {
-    // No PDF was made, so release the reserved number rather than leave a
-    // History row that points nowhere.
+    // The invoice wasn't recorded, so release the reserved number rather than
+    // leave a History row that points nowhere, and bin any PDF already made
+    // so it can't be mixed up with the next invoice to get that number.
     const row = findHistoryRow_(historySheet, invoiceNum);
     if (row) historySheet.deleteRow(row);
+    if (pdfFile) {
+      try { pdfFile.setTrashed(true); } catch (e) { /* best effort */ }
+    }
     throw err;
   }
 }
@@ -654,7 +659,14 @@ function createInvoicePdf_(inv, invoiceFolder) {
 
   const blob = Utilities.newBlob(fullPdfHtml, 'text/html', `Invoice_${inv.invoiceNum}_${inv.customer}.html`);
   const pdfFile = invoiceFolder.createFile(blob.getAs('application/pdf'));
-  pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  // A public link is a convenience only: app users can already open the PDF
+  // through the shared Invoices folder. Google refuses public sharing from
+  // some accounts ("Limit Exceeded: Drive"), and that mustn't fail the invoice.
+  try {
+    pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    console.warn("Couldn't make invoice " + inv.invoiceNum + " PDF public: " + err.message);
+  }
   return pdfFile;
 }
 
