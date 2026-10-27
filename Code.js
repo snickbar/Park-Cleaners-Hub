@@ -367,7 +367,7 @@ function finalizeInvoice(invoiceData) {
   const serviceDateFormatted = Utilities.formatDate(rawDate, tz, "MM/dd/yyyy");
   const dateIssuedFormatted = Utilities.formatDate(new Date(), tz, "MM/dd/yyyy");
 
-  const invoiceFolder = getInvoiceFolder_();
+  const invoiceFolder = atStep_("opening the Invoices folder", getInvoiceFolder_);
   const historySheet = getHistorySheet_();
 
   const itemsSummary = items.map(item => {
@@ -658,7 +658,8 @@ function createInvoicePdf_(inv, invoiceFolder) {
   `;
 
   const blob = Utilities.newBlob(fullPdfHtml, 'text/html', `Invoice_${inv.invoiceNum}_${inv.customer}.html`);
-  const pdfFile = invoiceFolder.createFile(blob.getAs('application/pdf'));
+  const pdfBlob = atStep_("converting the invoice to PDF", () => blob.getAs('application/pdf'));
+  const pdfFile = atStep_("saving the PDF to the Invoices folder", () => invoiceFolder.createFile(pdfBlob));
   // A public link is a convenience only: app users can already open the PDF
   // through the shared Invoices folder. Google refuses public sharing from
   // some accounts ("Limit Exceeded: Drive"), and that mustn't fail the invoice.
@@ -773,6 +774,18 @@ function setInvoiceStatusBulk(invoiceNums, field) {
   const result = {};
   rows.forEach(i => { result[String(nums[i][0]).trim()] = stored[i][0]; });
   return result;
+}
+
+/**
+ * Runs fn, adding which step failed to any error. Drive errors such as
+ * "Limit Exceeded: Drive" don't say which call raised them.
+ */
+function atStep_(step, fn) {
+  try {
+    return fn();
+  } catch (err) {
+    throw new Error((err && err.message || err) + " (while " + step + ")");
+  }
 }
 
 function highestDeletedInvoiceNum_() {
