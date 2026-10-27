@@ -206,6 +206,89 @@ function getBulkPrintFolder_() {
 }
 
 /* =========================================================================
+   SAVING PDFS
+   Files the app creates would belong to - and use the Drive storage of -
+   whoever is using it, so a staff account with full storage couldn't save
+   invoices. When the PDF Saver (pdf-saver/, a web app that runs as the
+   admin) is configured in Config.js, PDFs are saved and trashed through it
+   instead, so they're owned by the admin. Without it, Drive is used directly.
+   ========================================================================= */
+
+function pdfSaverConfigured_() {
+  return typeof PDF_SAVER_URL !== 'undefined' && !!PDF_SAVER_URL && !!PDF_SAVER_KEY;
+}
+
+function callPdfSaver_(request) {
+  request.key = PDF_SAVER_KEY;
+  request.rootFolderId = getInvoiceFolder_().getId();
+  const res = UrlFetchApp.fetch(PDF_SAVER_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(request),
+    muteHttpExceptions: true
+  });
+  let body;
+  try {
+    body = JSON.parse(res.getContentText());
+  } catch (e) {
+    throw new Error("The PDF Saver didn't answer properly (HTTP " + res.getResponseCode() +
+      "). The admin may need to open it and approve access.");
+  }
+  if (!body.ok) throw new Error("PDF Saver: " + body.error);
+  return body;
+}
+
+/**
+ * Saves a PDF blob into folder. Options: makePublic (anyone with the link
+ * can view, best effort), cleanupHours (first bin files in folder older
+ * than this). Returns { id, url }.
+ */
+function savePdf_(folder, pdfBlob, options) {
+  options = options || {};
+  if (pdfSaverConfigured_()) {
+    return callPdfSaver_({
+      action: 'save',
+      folderId: folder.getId(),
+      fileName: pdfBlob.getName(),
+      pdfBase64: Utilities.base64Encode(pdfBlob.getBytes()),
+      makePublic: !!options.makePublic,
+      cleanupHours: options.cleanupHours || 0
+    });
+  }
+
+  if (options.cleanupHours) {
+    const cutoff = Date.now() - options.cleanupHours * 60 * 60 * 1000;
+    const old = folder.getFiles();
+    while (old.hasNext()) {
+      const f = old.next();
+      if (f.getDateCreated().getTime() < cutoff) {
+        try { f.setTrashed(true); } catch (e) { /* made by someone else; leave it */ }
+      }
+    }
+  }
+  const file = folder.createFile(pdfBlob);
+  if (options.makePublic) {
+    // A public link is a convenience only: app users can already open the
+    // PDF through the shared Invoices folder.
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (err) {
+      console.warn("Couldn't make " + file.getName() + " public: " + err.message);
+    }
+  }
+  return { id: file.getId(), url: file.getUrl() };
+}
+
+/** Moves a PDF in the Invoices folder to the trash (or back out of it). */
+function trashPdf_(fileId, trashed) {
+  if (pdfSaverConfigured_()) {
+    callPdfSaver_({ action: trashed ? 'trash' : 'untrash', fileId: fileId });
+  } else {
+    DriveApp.getFileById(fileId).setTrashed(trashed);
+  }
+}
+
+/* =========================================================================
    CUSTOMERS & SERVICES (read)
    ========================================================================= */
 
@@ -398,9 +481,9 @@ function finalizeInvoice(invoiceData) {
     lock.releaseLock();
   }
 
-  let pdfFile = null;
+  let pdf = null;
   try {
-    pdfFile = createInvoicePdf_({
+    pdf = createInvoicePdf_({
       invoiceNum: invoiceNum,
       customer: customer,
       items: items,
@@ -408,7 +491,7 @@ function finalizeInvoice(invoiceData) {
       serviceDateFormatted: serviceDateFormatted,
       dateIssuedFormatted: dateIssuedFormatted
     }, invoiceFolder);
-    const pdfUrl = pdfFile.getUrl();
+    const pdfUrl = pdf.url;
     historySheet.getRange(findHistoryRow_(historySheet, invoiceNum), HISTORY_COL.pdfUrl).setValue(pdfUrl);
 
     return {
@@ -422,8 +505,8 @@ function finalizeInvoice(invoiceData) {
     // so it can't be mixed up with the next invoice to get that number.
     const row = findHistoryRow_(historySheet, invoiceNum);
     if (row) historySheet.deleteRow(row);
-    if (pdfFile) {
-      try { pdfFile.setTrashed(true); } catch (e) { /* best effort */ }
+    if (pdf) {
+      try { trashPdf_(pdf.id, true); } catch (e) { /* best effort */ }
     }
     throw err;
   }
@@ -659,16 +742,8 @@ function createInvoicePdf_(inv, invoiceFolder) {
 
   const blob = Utilities.newBlob(fullPdfHtml, 'text/html', `Invoice_${inv.invoiceNum}_${inv.customer}.html`);
   const pdfBlob = atStep_("converting the invoice to PDF", () => blob.getAs('application/pdf'));
-  const pdfFile = atStep_("saving the PDF to the Invoices folder", () => invoiceFolder.createFile(pdfBlob));
-  // A public link is a convenience only: app users can already open the PDF
-  // through the shared Invoices folder. Google refuses public sharing from
-  // some accounts ("Limit Exceeded: Drive"), and that mustn't fail the invoice.
-  try {
-    pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (err) {
-    console.warn("Couldn't make invoice " + inv.invoiceNum + " PDF public: " + err.message);
-  }
-  return pdfFile;
+  return atStep_("saving the PDF to the Invoices folder",
+    () => savePdf_(invoiceFolder, pdfBlob, { makePublic: true }));
 }
 
 /**
@@ -810,14 +885,12 @@ function deleteInvoice(invoiceNum) {
     if (!row) throw new Error("Invoice #" + invoiceNum + " was not found.");
 
     const fileId = driveIdFromUrl_(sheet.getRange(row, HISTORY_COL.pdfUrl).getValue());
-    let file = null;
     if (fileId) {
       try {
-        file = DriveApp.getFileById(fileId);
-        file.setTrashed(true);
+        trashPdf_(fileId, true);
       } catch (err) {
         let owner = '';
-        try { owner = file && file.getOwner() ? file.getOwner().getEmail() : ''; } catch (e) {}
+        try { owner = DriveApp.getFileById(fileId).getOwner().getEmail(); } catch (e) {}
         throw new Error("Its PDF couldn't be moved to the trash" +
           (owner ? ", because it belongs to " + owner + ". Ask them to delete this invoice." : ": " + err.message));
       }
@@ -831,7 +904,7 @@ function deleteInvoice(invoiceNum) {
       sheet.deleteRow(row);
       SpreadsheetApp.flush();
     } catch (err) {
-      if (file) file.setTrashed(false); // keep the PDF with its invoice
+      if (fileId) trashPdf_(fileId, false); // keep the PDF with its invoice
       throw err;
     }
   } finally {
@@ -872,22 +945,13 @@ function saveBulkPrintPdf(base64Pdf, invoiceCount) {
   requireUser_();
   const folder = getBulkPrintFolder_();
 
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const old = folder.getFiles();
-  while (old.hasNext()) {
-    const f = old.next();
-    if (f.getDateCreated().getTime() < cutoff) {
-      try { f.setTrashed(true); } catch (e) { /* made by someone else; leave it */ }
-    }
-  }
-
   const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HHmm");
   const blob = Utilities.newBlob(
     Utilities.base64Decode(base64Pdf),
     'application/pdf',
     `Bulk_Print_${Number(invoiceCount) || 0}_invoices_${stamp}.pdf`
   );
-  return folder.createFile(blob).getUrl();
+  return savePdf_(folder, blob, { cleanupHours: 24 }).url;
 }
 
 /* =========================================================================

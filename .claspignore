@@ -1,0 +1,4 @@
+pdf-saver/**
+.git/**
+.gitignore
+.claspignore
