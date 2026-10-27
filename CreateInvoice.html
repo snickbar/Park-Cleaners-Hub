@@ -462,11 +462,11 @@
 
       if (!serviceName) {
         appAlert("Please select a service.");
-        return;
+        return false;
       }
       if (!qtyVal || Number(qtyVal) < 1) {
         appAlert("Please enter a valid quantity.");
-        return;
+        return false;
       }
 
       const match = servicesData.find(s => s.service === serviceName);
@@ -497,6 +497,22 @@
 
       updateNavButtons();
       updateSaveButtonLabel();
+      return true;
+    }
+
+    // True when the item form holds input that hasn't been saved: anything
+    // typed into a new item, or changes to an existing item being edited.
+    function hasUnsavedItem() {
+      const serviceName = document.getElementById("serviceSelect").value;
+      const notes = document.getElementById("itemNotes").value.trim();
+      const qtyVal = document.getElementById("itemQty").value;
+
+      if (currentIndex >= itemsList.length) {
+        return !!(serviceName || notes || qtyVal);
+      }
+      if (!isEditing) return false;
+      const item = itemsList[currentIndex];
+      return serviceName !== item.service || notes !== item.notes || Number(qtyVal) !== item.quantity;
     }
 
     function setFieldsReadOnly(isReadOnly) {
@@ -581,6 +597,9 @@
         appAlert("Please select a customer before finalizing.");
         return;
       }
+      // Save the item still in the form so it isn't left off the invoice.
+      // If it's incomplete, saveCurrentItem says what's missing and we stop.
+      if (hasUnsavedItem() && !saveCurrentItem()) return;
       if (itemsList.length === 0) {
         appAlert("Please add at least one line item before finalizing.");
         return;
