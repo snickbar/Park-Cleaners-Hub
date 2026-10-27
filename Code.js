@@ -780,46 +780,50 @@ function highestDeletedInvoiceNum_() {
 }
 
 /**
- * Admin only. Removes an invoice from History and bins its PDF. Its number
- * is remembered so finalizeInvoice never hands it out again.
- * Returns { pdfTrashed } - false when the PDF couldn't be binned (e.g. it
- * belongs to another account) and was left in the Invoices folder.
+ * Removes an invoice from History after moving its PDF to the Drive trash.
+ * Its number is remembered so finalizeInvoice never hands it out again.
+ * Only a PDF's owner can trash it, so if that's refused nothing is deleted.
  */
 function deleteInvoice(invoiceNum) {
-  requireAdmin_();
+  requireUser_();
   const sheet = getHistorySheet_();
 
   // Same lock as finalizeInvoice, so a new invoice can't be numbered
   // between the row going and its number being recorded.
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
-  let pdfUrl;
   try {
     const row = findHistoryRow_(sheet, invoiceNum);
     if (!row) throw new Error("Invoice #" + invoiceNum + " was not found.");
-    pdfUrl = sheet.getRange(row, HISTORY_COL.pdfUrl).getValue();
 
-    const num = Number(invoiceNum);
-    if (num > highestDeletedInvoiceNum_()) {
-      PropertiesService.getScriptProperties().setProperty('HIGHEST_DELETED_INVOICE', String(num));
+    const fileId = driveIdFromUrl_(sheet.getRange(row, HISTORY_COL.pdfUrl).getValue());
+    let file = null;
+    if (fileId) {
+      try {
+        file = DriveApp.getFileById(fileId);
+        file.setTrashed(true);
+      } catch (err) {
+        let owner = '';
+        try { owner = file && file.getOwner() ? file.getOwner().getEmail() : ''; } catch (e) {}
+        throw new Error("Its PDF couldn't be moved to the trash" +
+          (owner ? ", because it belongs to " + owner + ". Ask them to delete this invoice." : ": " + err.message));
+      }
     }
-    sheet.deleteRow(row);
-    SpreadsheetApp.flush();
+
+    try {
+      const num = Number(invoiceNum);
+      if (num > highestDeletedInvoiceNum_()) {
+        PropertiesService.getScriptProperties().setProperty('HIGHEST_DELETED_INVOICE', String(num));
+      }
+      sheet.deleteRow(row);
+      SpreadsheetApp.flush();
+    } catch (err) {
+      if (file) file.setTrashed(false); // keep the PDF with its invoice
+      throw err;
+    }
   } finally {
     lock.releaseLock();
   }
-
-  let pdfTrashed = false;
-  const fileId = pdfUrl ? driveIdFromUrl_(pdfUrl) : '';
-  if (fileId) {
-    try {
-      DriveApp.getFileById(fileId).setTrashed(true);
-      pdfTrashed = true;
-    } catch (err) {
-      console.warn("Couldn't bin PDF for deleted invoice " + invoiceNum + ": " + err.message);
-    }
-  }
-  return { pdfTrashed: pdfTrashed || !fileId };
 }
 
 function driveIdFromUrl_(url) {
