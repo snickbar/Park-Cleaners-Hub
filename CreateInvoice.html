@@ -407,11 +407,11 @@
 
     google.script.run
       .withSuccessHandler(populateCustomers)
-      .withFailureHandler(err => alert("Error loading customers: " + err.message))
+      .withFailureHandler(err => appAlert("Error loading customers: " + err.message))
       .getCustomerList();
     google.script.run
       .withSuccessHandler(populateServices)
-      .withFailureHandler(err => alert("Error loading services: " + err.message))
+      .withFailureHandler(err => appAlert("Error loading services: " + err.message))
       .getServiceList();
     updateSaveButtonLabel();
 
@@ -461,11 +461,11 @@
       const qtyVal = document.getElementById("itemQty").value;
 
       if (!serviceName) {
-        alert("Please select a service.");
+        appAlert("Please select a service.");
         return;
       }
       if (!qtyVal || Number(qtyVal) < 1) {
-        alert("Please enter a valid quantity.");
+        appAlert("Please enter a valid quantity.");
         return;
       }
 
@@ -578,11 +578,11 @@
     function promptFinalize() {
       const customer = document.getElementById("customerSelect").value;
       if (!customer) {
-        alert("Please select a customer before finalizing.");
+        appAlert("Please select a customer before finalizing.");
         return;
       }
       if (itemsList.length === 0) {
-        alert("Please add at least one line item before finalizing.");
+        appAlert("Please add at least one line item before finalizing.");
         return;
       }
       document.getElementById("confirmModal").style.display = "flex";
@@ -628,7 +628,7 @@
       const submitBtn = document.getElementById("btnSubmitInvoice");
       submitBtn.disabled = false;
       submitBtn.textContent = "Yes, Submit";
-      alert("Error generating invoice PDF: " + err.message);
+      appAlert("Error generating invoice PDF: " + err.message);
     }
 
     // The Yes link opens the PDF in a new tab by itself; then head home.

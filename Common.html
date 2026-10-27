@@ -24,6 +24,56 @@
       ". Please reload, and tell the admin if it keeps happening.";
   };
 
+  // In-page replacements for alert() and confirm(). The Google Sites embed
+  // sandboxes the app without "allow-modals", so the browser's own dialogs
+  // are silently skipped there (and confirm() always returns false).
+  function showAppDialog_(message, buttons) {
+    var old = document.getElementById("appDialog");
+    if (old) old.parentNode.removeChild(old);
+
+    var overlay = document.createElement("div");
+    overlay.id = "appDialog";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);" +
+      "display:flex;align-items:center;justify-content:center;padding:16px;";
+    var card = document.createElement("div");
+    card.style.cssText = "background:#fff;border-radius:10px;padding:24px;max-width:480px;width:100%;" +
+      "font:18px Arial,sans-serif;color:#222;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center;";
+    var text = document.createElement("div");
+    text.style.cssText = "white-space:pre-line;margin-bottom:20px;";
+    text.textContent = message;
+    card.appendChild(text);
+
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:12px;justify-content:center;";
+    buttons.forEach(function(b) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = b.label;
+      btn.style.cssText = "font:bold 18px Arial,sans-serif;padding:10px 24px;border:none;border-radius:6px;" +
+        "cursor:pointer;color:#fff;background:" + (b.color || "#1565c0") + ";";
+      btn.onclick = function() {
+        overlay.parentNode.removeChild(overlay);
+        if (b.action) b.action();
+      };
+      row.appendChild(btn);
+    });
+    card.appendChild(row);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    row.firstChild.focus();
+  }
+
+  function appAlert(message) {
+    showAppDialog_(message, [{ label: "OK" }]);
+  }
+
+  function appConfirm(message, onYes) {
+    showAppDialog_(message, [
+      { label: "Yes", action: onYes },
+      { label: "Cancel", color: "#757575" }
+    ]);
+  }
+
   // Escapes text for use in HTML content *and* quoted attributes.
   function escapeHtml(str) {
     return String(str == null ? "" : str)
@@ -43,7 +93,7 @@
         window.scrollTo(0, 0);
       })
       .withFailureHandler(function(err) {
-        alert("Error loading page: " + err.message);
+        appAlert("Error loading page: " + err.message);
       })
       .loadPage(pageName || "Index");
     return false; // when used as a link's onclick, don't follow its href

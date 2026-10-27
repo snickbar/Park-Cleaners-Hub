@@ -337,7 +337,7 @@
           onUsersLoaded(data);
         })
         .withFailureHandler(function(err) {
-          alert("Couldn't add user: " + err.message);
+          appAlert("Couldn't add user: " + err.message);
           addBtn.disabled = false;
           addBtn.innerText = "Add User";
         })
@@ -345,15 +345,15 @@
     }
 
     function removeUser(email) {
-      if (!confirm(`Remove access for ${email}?\n\nThey will no longer be able to open the app, the spreadsheet, or the Invoices folder.`)) return;
-
-      google.script.run
-        .withSuccessHandler(onUsersLoaded)
-        .withFailureHandler(function(err) {
-          alert("Couldn't remove user: " + err.message);
-          loadUsers();
-        })
-        .removeUser(email);
+      appConfirm(`Remove access for ${email}?\n\nThey will no longer be able to open the app, the spreadsheet, or the Invoices folder.`, function() {
+        google.script.run
+          .withSuccessHandler(onUsersLoaded)
+          .withFailureHandler(function(err) {
+            appAlert("Couldn't remove user: " + err.message);
+            loadUsers();
+          })
+          .removeUser(email);
+      });
     }
 
     function copyAppUrl() {

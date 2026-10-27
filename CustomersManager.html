@@ -384,7 +384,7 @@
           loadCustomers();
         })
         .withFailureHandler(function(err) {
-          alert("Error saving customer: " + err.message);
+          appAlert("Error saving customer: " + err.message);
           resetForm();
           loadCustomers();
         })
@@ -415,17 +415,17 @@
     }
 
     function deleteCustomerRow(item) {
-      if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
+      appConfirm(`Are you sure you want to delete "${item.name}"?`, function() {
         google.script.run
           .withSuccessHandler(function() {
             loadCustomers();
           })
           .withFailureHandler(function(err) {
-            alert("Error deleting customer: " + err.message);
+            appAlert("Error deleting customer: " + err.message);
             loadCustomers();
           })
           .deleteCustomer(item.rowIndex, item.name);
-      }
+      });
     }
   </script>
 

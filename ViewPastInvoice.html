@@ -634,8 +634,16 @@
       const inv = findInvoice(invoiceNum);
       if (!inv) return;
       const isDone = !!inv[field];
-      if (isDone && !confirm(`Undo "${field}" for invoice #${invoiceNum}?`)) return;
+      if (isDone) {
+        appConfirm(`Undo "${field}" for invoice #${invoiceNum}?`, function() {
+          saveStatus(inv, invoiceNum, field, !isDone, btn);
+        });
+      } else {
+        saveStatus(inv, invoiceNum, field, !isDone, btn);
+      }
+    }
 
+    function saveStatus(inv, invoiceNum, field, done, btn) {
       btn.disabled = true;
       btn.textContent = "Saving...";
       google.script.run
@@ -644,10 +652,10 @@
           renderTable(displayedInvoices);
         })
         .withFailureHandler(function(err) {
-          alert("Couldn't update invoice #" + invoiceNum + ": " + err.message);
+          appAlert("Couldn't update invoice #" + invoiceNum + ": " + err.message);
           renderTable(displayedInvoices);
         })
-        .setInvoiceStatus(invoiceNum, field, !isDone);
+        .setInvoiceStatus(invoiceNum, field, done);
     }
 
     /* ---------- Selection ---------- */
@@ -655,7 +663,7 @@
     function setSelected(invoiceNum, isOn) {
       if (isOn) {
         if (selected.size >= MAX_BULK) {
-          alert(`You can bulk print up to ${MAX_BULK} invoices at a time.`);
+          appAlert(`You can bulk print up to ${MAX_BULK} invoices at a time.`);
           return false;
         }
         selected.add(invoiceNum);
@@ -753,7 +761,7 @@
         await loadPdfLib();
       } catch (err) {
         setBulkStatus("");
-        alert(err.message);
+        appAlert(err.message);
         return;
       }
 
@@ -792,7 +800,7 @@
         document.getElementById("bulkPdfLink").href = url;
         document.getElementById("bulkModal").style.display = "flex";
       } catch (err) {
-        alert("Bulk print failed: " + (err && err.message ? err.message : err));
+        appAlert("Bulk print failed: " + (err && err.message ? err.message : err));
       } finally {
         isBulkBusy = false;
         setBulkStatus("");
