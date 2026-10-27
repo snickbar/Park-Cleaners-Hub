@@ -366,6 +366,8 @@
     <div class="bulk-bar">
       <span class="bulk-count" id="selectedCount">0 selected</span>
       <button class="btn-bulk" id="btnBulkPrint" onclick="bulkPrint()" disabled>🖨️ Print Selected</button>
+      <button class="btn-bulk" id="btnBulkSent" onclick="bulkSetStatus('sent')" disabled>✉️ Set Selected as Sent</button>
+      <button class="btn-bulk" id="btnBulkPaid" onclick="bulkSetStatus('paid')" disabled>💲 Set Selected as Paid</button>
       <button class="btn-clear" id="btnClearSelection" onclick="clearSelection()" disabled>Clear Selection</button>
       <span class="bulk-status" id="bulkStatus"></span>
     </div>
@@ -658,12 +660,40 @@
         .setInvoiceStatus(invoiceNum, field, done);
     }
 
+    // Marks every selected invoice as sent/paid. Ones already marked keep
+    // their date. The selection is kept so the other status can follow.
+    function bulkSetStatus(field) {
+      if (selected.size === 0 || isBulkBusy) return;
+      const nums = Array.from(selected);
+      const word = field === 'sent' ? 'sent' : 'paid';
+      appConfirm(`Set ${nums.length} selected invoice${nums.length === 1 ? '' : 's'} as ${word}?\n\n` +
+          `Invoices already marked ${word} keep their original date.`, async function() {
+        isBulkBusy = true;
+        setBulkStatus("Saving...");
+        updateSelectionUI();
+        try {
+          const stored = await runServer("setInvoiceStatusBulk", nums, field);
+          for (const num of Object.keys(stored)) {
+            const inv = findInvoice(num);
+            if (inv) inv[field] = stored[num];
+          }
+          renderTable(displayedInvoices);
+        } catch (err) {
+          appAlert(`Couldn't set invoices as ${word}: ` + (err && err.message ? err.message : err));
+        } finally {
+          isBulkBusy = false;
+          setBulkStatus("");
+          updateSelectionUI();
+        }
+      });
+    }
+
     /* ---------- Selection ---------- */
 
     function setSelected(invoiceNum, isOn) {
       if (isOn) {
         if (selected.size >= MAX_BULK) {
-          appAlert(`You can bulk print up to ${MAX_BULK} invoices at a time.`);
+          appAlert(`You can select up to ${MAX_BULK} invoices at a time.`);
           return false;
         }
         selected.add(invoiceNum);
@@ -696,8 +726,9 @@
 
       document.getElementById("selectedCount").textContent =
         `${selected.size} selected` + (hidden > 0 ? ` (${hidden} hidden by filters)` : '');
-      document.getElementById("btnBulkPrint").disabled = selected.size === 0 || isBulkBusy;
-      document.getElementById("btnClearSelection").disabled = selected.size === 0 || isBulkBusy;
+      ["btnBulkPrint", "btnBulkSent", "btnBulkPaid", "btnClearSelection"].forEach(id => {
+        document.getElementById(id).disabled = selected.size === 0 || isBulkBusy;
+      });
 
       const selectAll = document.getElementById("selectAll");
       selectAll.checked = shown.length > 0 && shownSelected === shown.length;

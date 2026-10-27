@@ -726,6 +726,43 @@ function setInvoiceStatus(invoiceNum, field, done) {
   return cell.getDisplayValue();
 }
 
+/**
+ * Marks several invoices as sent or paid with today's date. Invoices that
+ * already have that mark keep their original date. Returns
+ * { invoiceNum: stored date text } for every invoice found.
+ */
+function setInvoiceStatusBulk(invoiceNums, field) {
+  requireUser_();
+  if (field !== 'sent' && field !== 'paid') throw new Error("Unknown status: " + field);
+  const col = HISTORY_COL[field];
+
+  const sheet = getHistorySheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {};
+  const nums = sheet.getRange(2, HISTORY_COL.invoiceNum, lastRow - 1, 1).getValues();
+  const statusRange = sheet.getRange(2, col, lastRow - 1, 1);
+  const current = statusRange.getDisplayValues();
+
+  const wanted = new Set((invoiceNums || []).map(n => String(n).trim()));
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
+  const rows = [];
+  nums.forEach((row, i) => {
+    if (wanted.has(String(row[0]).trim())) rows.push(i);
+  });
+
+  // Write only the blank cells, one by one, so a status someone else
+  // changes at the same moment on another row isn't overwritten.
+  rows.forEach(i => {
+    if (!current[i][0]) sheet.getRange(i + 2, col).setValue(today);
+  });
+  SpreadsheetApp.flush();
+
+  const stored = statusRange.getDisplayValues();
+  const result = {};
+  rows.forEach(i => { result[String(nums[i][0]).trim()] = stored[i][0]; });
+  return result;
+}
+
 function driveIdFromUrl_(url) {
   const m = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url).match(/[?&]id=([a-zA-Z0-9_-]+)/);
   return m ? m[1] : '';
