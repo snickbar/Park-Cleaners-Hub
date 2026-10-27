@@ -272,6 +272,11 @@
       color: #1b5e20;
     }
 
+    .btn-delete {
+      border-color: #c62828;
+      color: #c62828;
+    }
+
     .btn-status:disabled {
       opacity: 0.6;
       cursor: default;
@@ -424,11 +429,14 @@
     var MAX_BULK = 100;
     var PDFS_PER_REQUEST = 5;
     var isBulkBusy = false;
+    var IS_ADMIN = <?!= JSON.stringify(!!isAdmin) ?>;
 
     var tbody = document.getElementById("invoiceTableBody");
     tbody.addEventListener("click", function(event) {
       const btn = event.target.closest("button[data-status]");
       if (btn) toggleStatus(btn.dataset.num, btn.dataset.status, btn);
+      const delBtn = event.target.closest("button[data-delete]");
+      if (delBtn) confirmDeleteInvoice(delBtn.dataset.delete, delBtn);
     });
     tbody.addEventListener("change", function(event) {
       if (event.target.matches("input[data-select]")) {
@@ -614,6 +622,9 @@
         const selectBox = hasPdf
           ? `<input type="checkbox" data-select="${escapeHtml(row.invoiceNum)}" ${isSelected ? 'checked' : ''}>`
           : '';
+        const deleteButton = IS_ADMIN
+          ? `<button class="btn-status btn-delete" data-delete="${escapeHtml(row.invoiceNum)}">🗑️ Delete</button>`
+          : '';
 
         tr.innerHTML = `
           <td class="col-select">${selectBox}</td>
@@ -622,7 +633,7 @@
           <td><strong>${escapeHtml(row.customer)}</strong></td>
           <td>${escapeHtml(row.items)}</td>
           <td><strong>$${(parseFloat(row.total) || 0).toFixed(2)}</strong></td>
-          <td><div class="actions">${pdfBtn}${statusButton(row, 'sent')}${statusButton(row, 'paid')}</div></td>
+          <td><div class="actions">${pdfBtn}${statusButton(row, 'sent')}${statusButton(row, 'paid')}${deleteButton}</div></td>
         `;
         tbody.appendChild(tr);
       });
@@ -658,6 +669,33 @@
           renderTable(displayedInvoices);
         })
         .setInvoiceStatus(invoiceNum, field, done);
+    }
+
+    /* ---------- Delete (admin only) ---------- */
+
+    function confirmDeleteInvoice(invoiceNum, btn) {
+      const inv = findInvoice(invoiceNum);
+      if (!inv) return;
+      appConfirm(`Delete invoice #${invoiceNum} for ${inv.customer}?\n\n` +
+          `Its PDF goes to the Drive trash, and the number #${invoiceNum} won't be used again.`, function() {
+        btn.disabled = true;
+        btn.textContent = "Deleting...";
+        google.script.run
+          .withSuccessHandler(function(res) {
+            rawInvoices = rawInvoices.filter(r => r !== inv);
+            selected.delete(invoiceNum);
+            filterInvoices();
+            if (res && !res.pdfTrashed) {
+              appAlert(`Invoice #${invoiceNum} was deleted, but its PDF couldn't be moved to the trash ` +
+                `(it may belong to another account). You can remove it from the Invoices folder yourself.`);
+            }
+          })
+          .withFailureHandler(function(err) {
+            appAlert("Couldn't delete invoice #" + invoiceNum + ": " + err.message);
+            renderTable(displayedInvoices);
+          })
+          .deleteInvoice(invoiceNum);
+      });
     }
 
     // Marks every selected invoice as sent/paid. Ones already marked keep

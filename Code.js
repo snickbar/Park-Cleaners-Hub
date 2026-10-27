@@ -377,13 +377,13 @@ function finalizeInvoice(invoiceData) {
 
   // Reserve the invoice number by writing its History row while holding a
   // lock, so two people finalizing at once can't get the same number. The
-  // number is based on the highest existing one, so a deleted History row
-  // can't cause a number to be reused.
+  // number is based on the highest existing one, or the highest deleted one
+  // (see deleteInvoice), so a deleted invoice's number is never reused.
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   let invoiceNum;
   try {
-    let maxInvoiceNum = 1079;
+    let maxInvoiceNum = Math.max(1079, highestDeletedInvoiceNum_());
     const lastRow = historySheet.getLastRow();
     if (lastRow > 1) {
       historySheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(row => {
@@ -773,6 +773,53 @@ function setInvoiceStatusBulk(invoiceNums, field) {
   const result = {};
   rows.forEach(i => { result[String(nums[i][0]).trim()] = stored[i][0]; });
   return result;
+}
+
+function highestDeletedInvoiceNum_() {
+  return Number(PropertiesService.getScriptProperties().getProperty('HIGHEST_DELETED_INVOICE')) || 0;
+}
+
+/**
+ * Admin only. Removes an invoice from History and bins its PDF. Its number
+ * is remembered so finalizeInvoice never hands it out again.
+ * Returns { pdfTrashed } - false when the PDF couldn't be binned (e.g. it
+ * belongs to another account) and was left in the Invoices folder.
+ */
+function deleteInvoice(invoiceNum) {
+  requireAdmin_();
+  const sheet = getHistorySheet_();
+
+  // Same lock as finalizeInvoice, so a new invoice can't be numbered
+  // between the row going and its number being recorded.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let pdfUrl;
+  try {
+    const row = findHistoryRow_(sheet, invoiceNum);
+    if (!row) throw new Error("Invoice #" + invoiceNum + " was not found.");
+    pdfUrl = sheet.getRange(row, HISTORY_COL.pdfUrl).getValue();
+
+    const num = Number(invoiceNum);
+    if (num > highestDeletedInvoiceNum_()) {
+      PropertiesService.getScriptProperties().setProperty('HIGHEST_DELETED_INVOICE', String(num));
+    }
+    sheet.deleteRow(row);
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  let pdfTrashed = false;
+  const fileId = pdfUrl ? driveIdFromUrl_(pdfUrl) : '';
+  if (fileId) {
+    try {
+      DriveApp.getFileById(fileId).setTrashed(true);
+      pdfTrashed = true;
+    } catch (err) {
+      console.warn("Couldn't bin PDF for deleted invoice " + invoiceNum + ": " + err.message);
+    }
+  }
+  return { pdfTrashed: pdfTrashed || !fileId };
 }
 
 function driveIdFromUrl_(url) {
